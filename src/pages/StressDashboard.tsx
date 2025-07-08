@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStressPrediction } from "@/hooks/useStressPrediction";
 import {
   Heart,
   Thermometer,
@@ -22,6 +23,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
@@ -50,6 +53,7 @@ interface BiometricData {
 const StressDashboard: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { prediction, loading: predictionLoading, getPrediction } = useStressPrediction();
   const [currentData, setCurrentData] = useState<BiometricData | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [stressLevel, setStressLevel] = useState(0.3);
@@ -112,6 +116,11 @@ const StressDashboard: React.FC = () => {
           i2cEnabled: hasRecentData,
           hasRecentData
         }));
+
+        // Get AI prediction when new data arrives
+        if (hasRecentData && isMonitoring) {
+          getPrediction(data);
+        }
       } else {
         setEsp32Status(prev => ({
           ...prev,
@@ -135,12 +144,16 @@ const StressDashboard: React.FC = () => {
 
   const handleEmotionDetected = (emotion: string, confidence: number) => {
     console.log("Emotion detected:", emotion, confidence);
+    // Include emotion data in AI prediction
+    if (currentData && isMonitoring) {
+      getPrediction(currentData, { emotion, confidence });
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Simplified Header */}
+        {/* Header */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="space-y-2">
@@ -191,7 +204,46 @@ const StressDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Essential Sensor Data - Reduced Cards */}
+        {/* AI Prediction Display */}
+        {prediction && (
+          <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-700">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
+                <Sparkles className="w-5 h-5" />
+                AI Stress Analysis
+                {predictionLoading && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-4">
+                <Badge className={`${
+                  prediction.stressLevel === 'low' ? 'bg-green-100 text-green-800 border-green-300' :
+                  prediction.stressLevel === 'moderate' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                  'bg-red-100 text-red-800 border-red-300'
+                }`}>
+                  {prediction.stressLevel.charAt(0).toUpperCase() + prediction.stressLevel.slice(1)} Stress
+                </Badge>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Confidence: {(prediction.confidence * 100).toFixed(1)}%
+                </span>
+              </div>
+              {prediction.recommendations.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recommendations:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {prediction.recommendations.map((rec, index) => (
+                      <li key={index} className="text-sm text-gray-600 dark:text-gray-400">{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Essential Sensor Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-600 hover:shadow-lg transition-all duration-300">
             <CardHeader className="pb-2">
@@ -224,7 +276,7 @@ const StressDashboard: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                 <Thermometer className="w-4 h-4 text-red-500" />
-                Body Temperature
+                Temperature
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -242,7 +294,7 @@ const StressDashboard: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                 <Zap className="w-4 h-4 text-purple-500" />
-                GSR Level
+                EDA Level
               </CardTitle>
             </CardHeader>
             <CardContent>

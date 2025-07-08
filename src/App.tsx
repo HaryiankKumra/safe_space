@@ -63,8 +63,9 @@ function App() {
             <Toaster />
             <BrowserRouter>
               <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Index />} />
+                {/* Main landing page is introduction */}
+                <Route path="/" element={<IntroductionPage />} />
+                <Route path="/home" element={<Index />} />
                 <Route path="/introduction" element={<IntroductionPage />} />
                 <Route path="/how-it-works" element={<HowItWorksPage />} />
                 <Route path="/login" element={<LoginPage />} />
@@ -103,6 +104,36 @@ function App() {
                   <ProtectedRoute>
                     <DashboardLayout>
                       <SettingsPage />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/dashboard/chat" element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <div className="p-6">
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Assistant</h1>
+                        <p className="text-gray-600 dark:text-gray-300 mt-2">Chat with our AI assistant (Coming Soon)</p>
+                      </div>
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/dashboard/camera" element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <div className="p-6">
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Camera Analysis</h1>
+                        <p className="text-gray-600 dark:text-gray-300 mt-2">Facial expression analysis (Coming Soon)</p>
+                      </div>
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/dashboard/alerts" element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <div className="p-6">
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Stress Alerts</h1>
+                        <p className="text-gray-600 dark:text-gray-300 mt-2">Manage your stress notifications (Coming Soon)</p>
+                      </div>
                     </DashboardLayout>
                   </ProtectedRoute>
                 } />
