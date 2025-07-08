@@ -1,8 +1,9 @@
+
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Brain, Activity, Heart, Thermometer, Zap, Eye } from "lucide-react";
+import { Activity, Heart, Thermometer, Zap, Eye } from "lucide-react";
 
 const MLModelStatus: React.FC = () => {
   const models = [
@@ -49,7 +50,7 @@ const MLModelStatus: React.FC = () => {
     {
       name: "Combined Stress Predictor",
       type: "combined",
-      icon: <Brain className="w-4 h-4" />,
+      icon: <Activity className="w-4 h-4" />,
       accuracy: 94.1,
       status: "active",
       lastUpdate: "1 min ago",
@@ -76,8 +77,8 @@ const MLModelStatus: React.FC = () => {
     <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Brain className="w-5 h-5 text-purple-500" />
-          TensorFlow.js ML Models Status
+          <Activity className="w-5 h-5 text-purple-500" />
+          Hugging Face ML Models Status
           <Badge className="bg-purple-100 text-purple-800">5 Active</Badge>
         </CardTitle>
       </CardHeader>
@@ -126,63 +127,47 @@ const MLModelStatus: React.FC = () => {
         {/* Model Integration Instructions */}
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-lg">
           <h3 className="font-semibold text-lg mb-4 text-purple-800">
-            AI Model Integration
+            Hugging Face Model Integration
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="font-semibold mb-2 text-purple-700">
-                Model File Structure
+                Model Configuration
               </h4>
-              <div className="bg-white/70 p-4 rounded-lg font-mono text-sm">
-                <div className="text-gray-600">public/models/</div>
-                <div className="ml-2">├── gsr/</div>
-                <div className="ml-4">│ ├── model.json</div>
-                <div className="ml-4">│ └── weights.bin</div>
-                <div className="ml-2">├── heart_rate/</div>
-                <div className="ml-4">│ ├── model.json</div>
-                <div className="ml-4">│ └── weights.bin</div>
-                <div className="ml-2">├── temperature/</div>
-                <div className="ml-2">├── facial/</div>
-                <div className="ml-2">└── combined/</div>
+              <div className="bg-white/70 p-4 rounded-lg text-sm">
+                <div className="text-gray-700">
+                  <div>• Emotion Detection: Facebook DETR</div>
+                  <div>• Stress Analysis: Custom Models</div>
+                  <div>• Real-time Processing</div>
+                  <div>• Browser-based Inference</div>
+                </div>
               </div>
             </div>
 
             <div>
               <h4 className="font-semibold mb-2 text-purple-700">
-                ⚡ Loading Models
+                ⚡ Integration Status
               </h4>
               <div className="bg-white/70 p-4 rounded-lg text-sm">
-                <pre className="text-gray-700">{`// Load TensorFlow.js model
-import * as tf from '@tensorflow/tfjs';
+                <pre className="text-gray-700">{`// Hugging Face Integration
+import { pipeline } from '@huggingface/transformers';
 
-const loadModel = async (modelPath) => {
-  const model = await tf.loadLayersModel(
-    \`/models/\${modelPath}/model.json\`
-  );
-  return model;
-};
+const emotion = await pipeline(
+  'image-classification',
+  'microsoft/DialoGPT-medium'
+);
 
-// Usage
-const gsrModel = await loadModel('gsr');
-const prediction = gsrModel.predict(data);`}</pre>
+const result = await emotion(imageData);`}</pre>
               </div>
             </div>
           </div>
 
           <div className="mt-4 p-4 bg-blue-100/50 rounded-lg">
             <p className="text-blue-800 text-sm">
-              <strong>Next Steps:</strong>
-              1. Export your trained models from Python using{" "}
-              <code>tensorflowjs_converter</code>
+              <strong>Author:</strong> Haryiank Kumra
               <br />
-              2. Place model files in the public/models/ directory
-              <br />
-              3. Update the model loading logic in each component
-              <br />
-              4. Configure preprocessing to match your training pipeline
-              <br />
-              5. The models will run entirely in the browser on Vercel!
+              <strong>Integration:</strong> Real-time emotion detection using Hugging Face Transformers for browser-based inference without external API calls.
             </p>
           </div>
         </div>

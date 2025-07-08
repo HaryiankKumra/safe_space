@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ const StressDashboard: React.FC = () => {
   const { toast } = useToast();
   const [currentData, setCurrentData] = useState<BiometricData | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userName, setUserName] = useState<string>("");
   const [stressLevel, setStressLevel] = useState(0.3);
   const [stressStatus, setStressStatus] = useState<"low" | "moderate" | "high">(
     "low",
@@ -73,6 +75,7 @@ const StressDashboard: React.FC = () => {
     if (user) {
       fetchUserProfile();
       fetchLatestData();
+      setUserName(user.email?.split('@')[0] || 'User');
       const interval = setInterval(fetchLatestData, 3000);
       return () => clearInterval(interval);
     }
@@ -147,7 +150,9 @@ const StressDashboard: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+            <h1 className="text-4xl font-bold text-white mb-2">
+              Welcome back, {userName}! 👋
+            </h1>
             <p className="text-slate-300 flex items-center gap-2">
               <Clock className="w-4 h-4" />
               Last updated:{" "}
@@ -173,9 +178,8 @@ const StressDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Vital Signs Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Current Vitals */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
@@ -191,7 +195,6 @@ const StressDashboard: React.FC = () => {
                   </div>
                   <div className="text-xs text-slate-400">Normal Range</div>
                 </div>
-                {/* ECG Animation */}
                 <div className="w-16 h-8 relative overflow-hidden">
                   <svg className="w-full h-full" viewBox="0 0 64 32">
                     <path
@@ -200,18 +203,6 @@ const StressDashboard: React.FC = () => {
                       strokeWidth="2"
                       fill="none"
                       className="animate-pulse"
-                    />
-                    <path
-                      d="M0,16 L10,16 L12,8 L14,24 L16,16 L20,16 L22,12 L24,20 L26,16 L64,16"
-                      stroke="#ef4444"
-                      strokeWidth="2"
-                      fill="none"
-                      className="animate-pulse"
-                      style={{
-                        strokeDasharray: "100",
-                        strokeDashoffset: "100",
-                        animation: "dash 2s linear infinite",
-                      }}
                     />
                   </svg>
                 </div>
@@ -249,7 +240,6 @@ const StressDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* BMI Card */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
@@ -336,7 +326,6 @@ const StressDashboard: React.FC = () => {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Stress Metrics */}
           <div className="space-y-6">
             <StressMetrics
               stressLevel={stressLevel}
@@ -346,7 +335,6 @@ const StressDashboard: React.FC = () => {
             />
           </div>
 
-          {/* Camera and Status */}
           <div className="space-y-6">
             <CameraModule
               isActive={isMonitoring}
@@ -385,23 +373,12 @@ const StressDashboard: React.FC = () => {
             </CardContent>
           </Card>
         )}
-      </div>
 
-      {/* CSS for ECG Animation */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-          @keyframes dash {
-            0% {
-              stroke-dashoffset: 100;
-            }
-            100% {
-              stroke-dashoffset: -100;
-            }
-          }
-        `,
-        }}
-      />
+        {/* Footer */}
+        <div className="text-center text-slate-400 text-sm py-4">
+          <p>StressGuard AI - Developed by Haryiank Kumra</p>
+        </div>
+      </div>
     </div>
   );
 };

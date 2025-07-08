@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -17,6 +18,7 @@ import SignupPage from "@/pages/SignupPage";
 import StressDashboard from "@/pages/StressDashboard";
 import SettingsPage from "@/pages/SettingsPage";
 import HealthRecordsPage from "@/pages/HealthRecordsPage";
+import HowItWorksPage from "@/pages/HowItWorksPage";
 import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
 import StressChatbot from "@/components/StressChatbot";
@@ -132,6 +134,17 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <StressDashboard />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/dashboard/how-it-works"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <HowItWorksPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

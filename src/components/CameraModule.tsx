@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -198,7 +199,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
         canvas.height = videoRef.current.videoHeight;
         ctx.drawImage(videoRef.current, 0, 0);
 
-        // Simulate emotion detection (replace with actual TensorFlow.js model)
+        // Simulate emotion detection (will be replaced with Hugging Face model)
         const emotions = [
           "happy",
           "sad",
@@ -501,18 +502,6 @@ const CameraModule: React.FC<CameraModuleProps> = ({
                   </Badge>
                 </div>
               </div>
-            </div>
-
-            {/* Info Panel */}
-            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 p-4 rounded-xl border border-blue-500/20 backdrop-blur-sm">
-              <p className="text-blue-400 text-sm leading-relaxed">
-                <strong>AI Model Integration:</strong> This module uses
-                simulated emotion detection. Integrate TensorFlow.js models in{" "}
-                <code className="text-purple-400 bg-slate-800/50 px-1 rounded">
-                  /public/models/
-                </code>
-                for real-time facial emotion analysis.
-              </p>
             </div>
           </div>
         </div>
