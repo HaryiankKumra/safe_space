@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 interface HealthCheckResult {
@@ -9,16 +10,9 @@ interface HealthCheckResult {
 }
 
 const requiredTables = [
-  "auth_users",
   "user_profiles",
-  "health_records",
-  "stress_detections",
-  "biometric_readings",
-  "chat_history",
-  "sensor_data",
-  "stress_predictions",
-  "notifications",
-  "device_registrations",
+  "health_records", 
+  "biometric_data_enhanced",
   "contact_messages",
 ];
 
@@ -34,14 +28,14 @@ export const performSupabaseHealthCheck = async (): Promise<HealthCheckResult> =
   try {
     console.log("🔍 Testing Supabase connection...");
     const { error: connectionError } = await supabase
-      .from("auth_users")
+      .from("user_profiles")
       .select("id")
       .limit(1);
 
     if (connectionError) {
       result.errors.push(`Connection failed: ${connectionError.message}`);
 
-      if (connectionError.message.includes('relation "auth_users" does not exist')) {
+      if (connectionError.message.includes('relation "user_profiles" does not exist')) {
         result.recommendations.push(
           "Run migrations or the database initializer to create missing tables."
         );
@@ -89,27 +83,14 @@ export const performSupabaseHealthCheck = async (): Promise<HealthCheckResult> =
 
     console.log("🔍 Checking for sample data...");
     const { data: userData, error: userError, count } = await supabase
-      .from("auth_users")
+      .from("user_profiles")
       .select("*", { count: "exact", head: true });
 
     if (userError) {
       result.warnings.push("Could not verify sample user data.");
     } else if (count === 0) {
-      result.warnings.push("⚠️ No sample users found.");
-      result.recommendations.push("Run initializer to insert sample users for testing.");
-    }
-
-    console.log("🔍 Checking RLS policy status...");
-    try {
-      const { data: rlsData, error: rlsError } = await supabase.rpc("check_rls_enabled");
-      if (rlsError) {
-        result.warnings.push("Could not verify RLS status (RPC missing).");
-      } else if (rlsData === false) {
-        result.warnings.push("RLS appears to be disabled.");
-        result.recommendations.push("Enable RLS for production security.");
-      }
-    } catch {
-      result.warnings.push("Skipping RLS check (RPC not configured).");
+      result.warnings.push("⚠️ No user profiles found.");
+      result.recommendations.push("Run initializer to insert sample data for testing.");
     }
 
     if (result.errors.length === 0 && result.warnings.length === 0) {
@@ -139,14 +120,15 @@ export const autoFixCommonIssues = async (): Promise<{
       user_id: "test-user",
       heart_rate: 72,
       temperature: 36.5,
+      gsr_value: 0.5,
       timestamp: new Date().toISOString(),
     };
 
-    const { error: insertError } = await supabase.from("sensor_data").insert(testData);
+    const { error: insertError } = await supabase.from("biometric_data_enhanced").insert(testData);
     if (insertError) {
       result.failed.push(`Database write test failed: ${insertError.message}`);
     } else {
-      await supabase.from("sensor_data").delete().eq("id", "health-check-test");
+      await supabase.from("biometric_data_enhanced").delete().eq("id", "health-check-test");
       result.fixed.push("Database write permissions verified.");
     }
   } catch (error) {
@@ -169,7 +151,7 @@ export const getSupabaseStatus = async () => {
 
 export const quickConnectionTest = async (): Promise<boolean> => {
   try {
-    const { error } = await supabase.from("auth_users").select("id").limit(1);
+    const { error } = await supabase.from("user_profiles").select("id").limit(1);
     return !error;
   } catch {
     return false;
