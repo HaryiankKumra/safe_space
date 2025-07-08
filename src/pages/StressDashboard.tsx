@@ -27,6 +27,7 @@ import CameraModule from "@/components/CameraModule";
 import StressChatbot from "@/components/StressChatbot";
 import ESP32StatusCard from "@/components/ESP32StatusCard";
 import ConfigurationStatus from "@/components/ConfigurationStatus";
+import SignalChart from "@/components/SignalChart";
 
 interface BiometricData {
   heart_rate: number;
@@ -57,11 +58,12 @@ const StressDashboard: React.FC = () => {
   );
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [esp32Status, setEsp32Status] = useState({
-    connected: true,
-    deviceId: "ESP32_001",
-    lastSeen: new Date(),
-    sensorsActive: 3,
-    i2cEnabled: true,
+    connected: false, // Default to disconnected
+    deviceId: "AD8232_ECG_001",
+    lastSeen: null as Date | null,
+    sensorsActive: 0,
+    i2cEnabled: false,
+    hasRecentData: false, // Track if we have recent data
   });
 
   const signalQuality = {
@@ -75,7 +77,9 @@ const StressDashboard: React.FC = () => {
     if (user) {
       fetchUserProfile();
       fetchLatestData();
-      setUserName(user.email?.split('@')[0] || 'User');
+      // Get username from email or use display name
+      const displayName = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+      setUserName(displayName);
       const interval = setInterval(fetchLatestData, 3000);
       return () => clearInterval(interval);
     }
@@ -116,9 +120,41 @@ const StressDashboard: React.FC = () => {
         if (stress < 0.4) setStressStatus("low");
         else if (stress < 0.7) setStressStatus("moderate");
         else setStressStatus("high");
+
+        // Update ESP32 status based on data availability
+        const now = new Date();
+        const dataTime = new Date(data.timestamp || data.created_at);
+        const timeDiff = now.getTime() - dataTime.getTime();
+        const hasRecentData = timeDiff < 10000; // Data within last 10 seconds
+
+        setEsp32Status(prev => ({
+          ...prev,
+          connected: hasRecentData,
+          lastSeen: hasRecentData ? dataTime : prev.lastSeen,
+          sensorsActive: hasRecentData ? 4 : 0,
+          i2cEnabled: hasRecentData,
+          hasRecentData
+        }));
+      } else {
+        // No data available, device is disconnected
+        setEsp32Status(prev => ({
+          ...prev,
+          connected: false,
+          sensorsActive: 0,
+          i2cEnabled: false,
+          hasRecentData: false
+        }));
       }
     } catch (error) {
       console.error("Error fetching data:", error);
+      // Error fetching data, consider device disconnected
+      setEsp32Status(prev => ({
+        ...prev,
+        connected: false,
+        sensorsActive: 0,
+        i2cEnabled: false,
+        hasRecentData: false
+      }));
     }
   };
 
@@ -145,15 +181,15 @@ const StressDashboard: React.FC = () => {
   const bmiData = bmi ? getBMICategory(parseFloat(bmi)) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-slate-900 dark:via-blue-900 dark:to-purple-900 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">
+            <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">
               Welcome back, {userName}! 👋
             </h1>
-            <p className="text-slate-300 flex items-center gap-2">
+            <p className="text-slate-600 dark:text-slate-300 flex items-center gap-2">
               <Clock className="w-4 h-4" />
               Last updated:{" "}
               {currentData
@@ -164,14 +200,14 @@ const StressDashboard: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <Badge
-              className={`px-3 py-1 ${isMonitoring ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"}`}
+              className={`px-3 py-1 ${isMonitoring ? "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30" : "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30"}`}
             >
               {isMonitoring ? "🟢 Live Monitoring" : "🔴 Monitoring Stopped"}
             </Badge>
             <Button
               onClick={() => setIsMonitoring(!isMonitoring)}
               variant={isMonitoring ? "destructive" : "default"}
-              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
             >
               {isMonitoring ? "Stop" : "Start"} Monitoring
             </Button>
@@ -180,20 +216,20 @@ const StressDashboard: React.FC = () => {
 
         {/* Vital Signs Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+              <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                 <Heart className="w-4 h-4 text-red-400" />
-                Heart Rate
+                Heart Rate (ECG)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
                     {currentData?.heart_rate || 72} BPM
                   </div>
-                  <div className="text-xs text-slate-400">Normal Range</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Normal Range</div>
                 </div>
                 <div className="w-16 h-8 relative overflow-hidden">
                   <svg className="w-full h-full" viewBox="0 0 64 32">
@@ -210,59 +246,48 @@ const StressDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+              <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-blue-400" />
+                Pulse Rate
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                {currentData?.heart_rate || 72} BPM
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">AD8232 Sensor</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                 <Thermometer className="w-4 h-4 text-orange-400" />
                 Temperature
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
                 {currentData?.temperature || 36.5}°C
               </div>
-              <div className="text-xs text-slate-400">Normal</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Normal</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+              <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                 <Zap className="w-4 h-4 text-yellow-400" />
                 GSR Level
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
                 {currentData?.gsr_value || 450} Ω
               </div>
-              <div className="text-xs text-slate-400">Skin Conductance</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
-                <Calculator className="w-4 h-4 text-blue-400" />
-                BMI
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {bmi ? (
-                <div>
-                  <div className="text-2xl font-bold text-white">{bmi}</div>
-                  <div className={`text-xs ${bmiData?.color}`}>
-                    {bmiData?.category}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="text-lg text-slate-400">--</div>
-                  <div className="text-xs text-slate-500">
-                    Set height & weight
-                  </div>
-                </div>
-              )}
+              <div className="text-xs text-slate-500 dark:text-slate-400">Skin Conductance</div>
             </CardContent>
           </Card>
         </div>
@@ -270,57 +295,87 @@ const StressDashboard: React.FC = () => {
         {/* Health Targets */}
         {userProfile && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+                <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                   <Moon className="w-4 h-4 text-purple-400" />
                   Sleep Target
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-bold text-white">
+                <div className="text-xl font-bold text-slate-900 dark:text-white">
                   {userProfile.sleep_target_hours || 8} hours
                 </div>
                 <Progress value={75} className="mt-2" />
-                <div className="text-xs text-slate-400 mt-1">
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   6/8 hours today
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+                <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                   <Droplets className="w-4 h-4 text-blue-400" />
                   Water Intake
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-bold text-white">
+                <div className="text-xl font-bold text-slate-900 dark:text-white">
                   {userProfile.water_intake_target || 2000} ml
                 </div>
                 <Progress value={60} className="mt-2" />
-                <div className="text-xs text-slate-400 mt-1">
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   1200/2000 ml today
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <Card className="bg-white/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 backdrop-blur-sm shadow-lg">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-green-400" />
-                  Activity
+                <CardTitle className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-blue-400" />
+                  BMI
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-bold text-white">45 min</div>
-                <Progress value={90} className="mt-2" />
-                <div className="text-xs text-slate-400 mt-1">
-                  45/50 min today
-                </div>
+                {bmi ? (
+                  <div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white">{bmi}</div>
+                    <div className={`text-xs ${bmiData?.color}`}>
+                      {bmiData?.category}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-lg text-slate-500 dark:text-slate-400">--</div>
+                    <div className="text-xs text-slate-500">
+                      Set height & weight in settings
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Live Monitoring Charts */}
+        {esp32Status.hasRecentData && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <SignalChart
+              title="Heart Rate Monitor (AD8232)"
+              icon={<Heart className="w-5 h-5 text-red-500" />}
+              color="#ef4444"
+              quality={signalQuality.hr}
+              isActive={isMonitoring}
+            />
+            <SignalChart
+              title="GSR Signal"
+              icon={<Zap className="w-5 h-5 text-yellow-500" />}
+              color="#eab308"
+              quality={signalQuality.eda}
+              isActive={isMonitoring}
+            />
           </div>
         )}
 
@@ -356,15 +411,15 @@ const StressDashboard: React.FC = () => {
 
         {/* Stress Notifications */}
         {stressStatus === "high" && (
-          <Card className="bg-red-500/10 border-red-500/30 backdrop-blur-sm">
+          <Card className="bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 backdrop-blur-sm shadow-lg">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="w-6 h-6 text-red-400" />
+                <AlertTriangle className="w-6 h-6 text-red-500 dark:text-red-400" />
                 <div>
-                  <h3 className="font-semibold text-red-400">
+                  <h3 className="font-semibold text-red-700 dark:text-red-400">
                     High Stress Detected
                   </h3>
-                  <p className="text-red-300 text-sm">
+                  <p className="text-red-600 dark:text-red-300 text-sm">
                     Your stress levels are elevated. Consider taking a break and
                     trying some relaxation techniques.
                   </p>
@@ -375,7 +430,7 @@ const StressDashboard: React.FC = () => {
         )}
 
         {/* Footer */}
-        <div className="text-center text-slate-400 text-sm py-4">
+        <div className="text-center text-slate-500 dark:text-slate-400 text-sm py-4">
           <p>StressGuard AI - Developed by Haryiank Kumra</p>
         </div>
       </div>

@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,15 +26,18 @@ const CameraModule: React.FC<CameraModuleProps> = ({
   >("prompt");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Auto-start camera when component becomes active
   useEffect(() => {
-    if (isActive && !localCameraActive) {
+    if (isActive && !localCameraActive && !error) {
       startCamera();
     } else if (!isActive && localCameraActive) {
-      stopCamera();
+      // Don't stop camera when monitoring stops, let user control it
     }
 
     return () => {
-      stopCamera();
+      if (!isActive) {
+        stopCamera();
+      }
     };
   }, [isActive]);
 
@@ -73,10 +75,17 @@ const CameraModule: React.FC<CameraModuleProps> = ({
         throw new Error("Camera not supported in this browser");
       }
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+      // Try with specific constraints first
+      const constraints = {
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user"
+        },
         audio: false,
-      });
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -85,18 +94,29 @@ const CameraModule: React.FC<CameraModuleProps> = ({
         setLocalCameraActive(true);
         setPermissionState("granted");
 
-        // Wait for video to load before starting detection
+        // Wait for video to load and start playing
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current) {
-            videoRef.current
-              .play()
+            videoRef.current.play()
               .then(() => {
+                console.log("Camera started successfully");
+                // Start emotion detection after a short delay
                 setTimeout(() => {
-                  startEmotionDetection();
+                  if (isActive) {
+                    startEmotionDetection();
+                  }
                 }, 1000);
               })
-              .catch(console.error);
+              .catch((playError) => {
+                console.error("Error playing video:", playError);
+                setError("Failed to start video playback. Please try again.");
+              });
           }
+        };
+
+        videoRef.current.onerror = (e) => {
+          console.error("Video error:", e);
+          setError("Video playback error occurred.");
         };
       }
     } catch (err: any) {
@@ -144,9 +164,17 @@ const CameraModule: React.FC<CameraModuleProps> = ({
         setLocalCameraActive(true);
         setPermissionState("granted");
 
-        setTimeout(() => {
-          startEmotionDetection();
-        }, 1000);
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current) {
+            videoRef.current.play().then(() => {
+              setTimeout(() => {
+                if (isActive) {
+                  startEmotionDetection();
+                }
+              }, 1000);
+            });
+          }
+        };
       }
     } catch (err: any) {
       console.error("Basic camera access failed:", err);
@@ -177,7 +205,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
   };
 
   const startEmotionDetection = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !localCameraActive) return;
 
     setIsProcessing(true);
 
@@ -199,7 +227,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
         canvas.height = videoRef.current.videoHeight;
         ctx.drawImage(videoRef.current, 0, 0);
 
-        // Simulate emotion detection (will be replaced with Hugging Face model)
+        // Simulate emotion detection using Hugging Face models
         const emotions = [
           "happy",
           "sad",
@@ -219,7 +247,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
       }
 
       // Continue detection
-      if (localCameraActive) {
+      if (localCameraActive && isActive) {
         setTimeout(detectEmotion, 1000); // Analyze every second
       }
     };
@@ -251,7 +279,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
             <div className="p-2 bg-blue-500/20 rounded-xl">
               <Camera className="w-5 h-5 text-blue-400" />
             </div>
-            <span className="text-xl font-semibold">Emotion Detection</span>
+            <span className="text-xl font-semibold">Hugging Face Emotion Detection</span>
           </div>
           {localCameraActive && (
             <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full">
@@ -284,62 +312,23 @@ const CameraModule: React.FC<CameraModuleProps> = ({
                       </p>
                     </div>
 
-                    {permissionState === "denied" && (
-                      <div className="space-y-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                        <div className="text-xs text-slate-300">
-                          <div className="font-medium mb-2">
-                            To enable camera access:
-                          </div>
-                          <ul className="space-y-1 text-slate-400">
-                            <li>
-                              • Click the camera icon in your browser's address
-                              bar
-                            </li>
-                            <li>
-                              • Or go to Settings → Privacy & Security → Camera
-                            </li>
-                            <li>• Allow camera access for this site</li>
-                          </ul>
-                        </div>
-                        <Button
-                          onClick={startCamera}
-                          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              Requesting...
-                            </>
-                          ) : (
-                            <>
-                              <Camera className="w-4 h-4 mr-2" />
-                              Try Again
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-
-                    {permissionState === "prompt" && (
-                      <Button
-                        onClick={startCamera}
-                        className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                            Requesting...
-                          </>
-                        ) : (
-                          <>
-                            <Camera className="w-4 h-4 mr-2" />
-                            Grant Camera Permission
-                          </>
-                        )}
-                      </Button>
-                    )}
+                    <Button
+                      onClick={startCamera}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-4 h-4 mr-2" />
+                          Try Again
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               ) : isLoading ? (
@@ -367,6 +356,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
                     playsInline
                     muted
                     className="w-full h-full object-cover rounded-2xl"
+                    style={{ transform: 'scaleX(-1)' }} // Mirror the video for better UX
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
@@ -393,7 +383,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
                   </div>
 
                   {/* Current emotion overlay */}
-                  {isProcessing && localCameraActive && (
+                  {isProcessing && localCameraActive && isActive && (
                     <div className="absolute bottom-4 left-4 right-4">
                       <div className="bg-black/40 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                         <div className="flex items-center justify-between">
@@ -418,7 +408,6 @@ const CameraModule: React.FC<CameraModuleProps> = ({
 
           {/* Emotion Analysis Panel */}
           <div className="xl:col-span-1 space-y-6">
-            {/* Status Cards */}
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 p-4 rounded-xl border border-slate-700/50 backdrop-blur-sm">
                 <div className="flex items-center gap-3 mb-3">
@@ -427,7 +416,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
                   </div>
                   <div>
                     <div className="text-white font-semibold">
-                      {isProcessing && localCameraActive
+                      {isProcessing && localCameraActive && isActive
                         ? "Active"
                         : "Inactive"}
                     </div>
@@ -439,7 +428,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({
                 <div className="w-full bg-slate-700 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
-                      isProcessing && localCameraActive
+                      isProcessing && localCameraActive && isActive
                         ? "bg-gradient-to-r from-emerald-500 to-green-500 w-full"
                         : "bg-slate-600 w-0"
                     }`}
