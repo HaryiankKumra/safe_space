@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 import {
   User,
   CheckCircle,
@@ -33,9 +34,31 @@ const AuthDebugger: React.FC = () => {
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    checkConnection();
-  }, []);
+  // useEffect(() => {
+  //   checkConnection();
+  // }, []);
+// Add this somewhere inside your main App component or AuthContext
+useEffect(() => {
+  const hash = window.location.hash;
+
+  if (hash.includes("access_token")) {
+    const url = new URL(window.location.href.replace("#", "?"));
+    const access_token = url.searchParams.get("access_token");
+    const refresh_token = url.searchParams.get("refresh_token");
+
+    if (access_token && refresh_token) {
+      supabase.auth.setSession({
+        access_token,
+        refresh_token,
+      }).then(() => {
+        // Optional: redirect after setting session
+        window.history.replaceState(null, "", "/dashboard");
+      }).catch((err) => {
+        console.error("Failed to set session", err);
+      });
+    }
+  }
+}, []);
 
   return (
     <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
