@@ -16,10 +16,18 @@ export type Database = {
     Tables: {
       biometric_data_enhanced: {
         Row: {
+          ambient_temperature: number | null
+          arrhythmia_detected: boolean | null
           created_at: string | null
+          device_status: Json | null
+          gsr_baseline: number | null
+          gsr_change: number | null
           gsr_value: number | null
           heart_rate: number | null
+          heart_rate_variability: number | null
           id: string
+          leads_off_detected: boolean | null
+          raw_ecg_signal: number | null
           stress_level: string | null
           stress_score: number | null
           temperature: number | null
@@ -27,10 +35,18 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          ambient_temperature?: number | null
+          arrhythmia_detected?: boolean | null
           created_at?: string | null
+          device_status?: Json | null
+          gsr_baseline?: number | null
+          gsr_change?: number | null
           gsr_value?: number | null
           heart_rate?: number | null
+          heart_rate_variability?: number | null
           id?: string
+          leads_off_detected?: boolean | null
+          raw_ecg_signal?: number | null
           stress_level?: string | null
           stress_score?: number | null
           temperature?: number | null
@@ -38,10 +54,18 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          ambient_temperature?: number | null
+          arrhythmia_detected?: boolean | null
           created_at?: string | null
+          device_status?: Json | null
+          gsr_baseline?: number | null
+          gsr_change?: number | null
           gsr_value?: number | null
           heart_rate?: number | null
+          heart_rate_variability?: number | null
           id?: string
+          leads_off_detected?: boolean | null
+          raw_ecg_signal?: number | null
           stress_level?: string | null
           stress_score?: number | null
           temperature?: number | null
@@ -241,28 +265,52 @@ export type Database = {
       }
       sensor_data: {
         Row: {
+          ambient_temperature: number | null
+          arrhythmia_detected: boolean | null
           device_id: string | null
+          device_status: Json | null
+          gsr_baseline: number | null
+          gsr_change: number | null
           gsr_value: number | null
           heart_rate: number | null
+          heart_rate_variability: number | null
           id: string
+          leads_off_detected: boolean | null
+          raw_ecg_signal: number | null
           temperature: number | null
           timestamp: string | null
           user_id: string | null
         }
         Insert: {
+          ambient_temperature?: number | null
+          arrhythmia_detected?: boolean | null
           device_id?: string | null
+          device_status?: Json | null
+          gsr_baseline?: number | null
+          gsr_change?: number | null
           gsr_value?: number | null
           heart_rate?: number | null
+          heart_rate_variability?: number | null
           id?: string
+          leads_off_detected?: boolean | null
+          raw_ecg_signal?: number | null
           temperature?: number | null
           timestamp?: string | null
           user_id?: string | null
         }
         Update: {
+          ambient_temperature?: number | null
+          arrhythmia_detected?: boolean | null
           device_id?: string | null
+          device_status?: Json | null
+          gsr_baseline?: number | null
+          gsr_change?: number | null
           gsr_value?: number | null
           heart_rate?: number | null
+          heart_rate_variability?: number | null
           id?: string
+          leads_off_detected?: boolean | null
+          raw_ecg_signal?: number | null
           temperature?: number | null
           timestamp?: string | null
           user_id?: string | null

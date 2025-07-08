@@ -20,21 +20,73 @@ serve(async (req) => {
     );
 
     if (req.method === 'POST') {
-      const { user_id, heart_rate, temperature, gsr_value, timestamp } = await req.json();
+      const { 
+        user_id, 
+        heart_rate, 
+        temperature, 
+        ambient_temperature,
+        gsr_value, 
+        gsr_baseline,
+        gsr_change,
+        raw_ecg_signal,
+        leads_off_detected,
+        heart_rate_variability,
+        arrhythmia_detected,
+        device_status,
+        timestamp 
+      } = await req.json();
 
-      console.log('Received sensor data:', { user_id, heart_rate, temperature, gsr_value, timestamp });
+      console.log('Received enhanced sensor data:', { 
+        user_id, 
+        heart_rate, 
+        temperature, 
+        ambient_temperature,
+        gsr_value, 
+        gsr_baseline,
+        gsr_change,
+        raw_ecg_signal,
+        leads_off_detected,
+        heart_rate_variability,
+        arrhythmia_detected,
+        timestamp 
+      });
+
+      // Calculate stress score based on multiple factors
+      let stressScore = 0;
+      let stressLevel = 'low';
+      
+      if (heart_rate && gsr_value) {
+        // Basic stress calculation using heart rate and GSR
+        const hrFactor = heart_rate > 100 ? 0.4 : (heart_rate > 80 ? 0.2 : 0.1);
+        const gsrFactor = gsr_change ? (gsr_change > 100 ? 0.5 : (gsr_change > 50 ? 0.3 : 0.1)) : 0.1;
+        const tempFactor = temperature > 37.5 ? 0.1 : 0;
+        
+        stressScore = Math.min(100, Math.floor((hrFactor + gsrFactor + tempFactor) * 100));
+        
+        if (stressScore < 40) stressLevel = 'low';
+        else if (stressScore < 70) stressLevel = 'moderate';
+        else stressLevel = 'high';
+      }
 
       // Insert into biometric_data_enhanced table
       const { data: biometricData, error: biometricError } = await supabaseClient
         .from('biometric_data_enhanced')
         .insert({
-          user_id: user_id,
+          user_id: user_id || 'cd85c225-fc57-4f51-be37-a9790faf0d3a', // Default user ID
           heart_rate: heart_rate ? parseInt(heart_rate) : null,
           temperature: temperature ? parseFloat(temperature) : null,
+          ambient_temperature: ambient_temperature ? parseFloat(ambient_temperature) : null,
           gsr_value: gsr_value ? parseFloat(gsr_value) : null,
+          gsr_baseline: gsr_baseline ? parseInt(gsr_baseline) : null,
+          gsr_change: gsr_change ? parseInt(gsr_change) : null,
+          raw_ecg_signal: raw_ecg_signal ? parseInt(raw_ecg_signal) : null,
+          leads_off_detected: leads_off_detected || false,
+          heart_rate_variability: heart_rate_variability ? parseFloat(heart_rate_variability) : null,
+          arrhythmia_detected: arrhythmia_detected || false,
+          device_status: device_status || null,
           timestamp: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
-          stress_level: 'low', // Default value
-          stress_score: Math.floor(Math.random() * 100) // Simple calculation
+          stress_level: stressLevel,
+          stress_score: stressScore
         })
         .select()
         .single();
@@ -47,13 +99,17 @@ serve(async (req) => {
         });
       }
 
-      console.log('Data inserted successfully:', biometricData);
+      console.log('Enhanced data inserted successfully:', biometricData);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'Data received successfully',
-          data: biometricData
+          message: 'Enhanced sensor data received successfully',
+          data: biometricData,
+          calculated_stress: {
+            score: stressScore,
+            level: stressLevel
+          }
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

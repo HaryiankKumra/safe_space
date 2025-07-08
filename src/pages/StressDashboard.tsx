@@ -26,6 +26,10 @@ import {
   Wifi,
   WifiOff,
   Signal,
+  Eye,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
@@ -37,7 +41,15 @@ import SignalChart from "@/components/SignalChart";
 interface BiometricData {
   heart_rate: number;
   temperature: number;
+  ambient_temperature: number;
   gsr_value: number;
+  gsr_baseline: number;
+  gsr_change: number;
+  raw_ecg_signal: number;
+  leads_off_detected: boolean;
+  heart_rate_variability: number;
+  arrhythmia_detected: boolean;
+  device_status: any;
   stress_level: string;
   stress_score: number;
   timestamp: string;
@@ -180,16 +192,16 @@ const StressDashboard: React.FC = () => {
   const bmiData = bmi ? getBMICategory(parseFloat(bmi)) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 lg:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="space-y-2">
-              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 Welcome back, {userName}! 👋
               </h1>
-              <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
                 <div className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   <span>{new Date().toLocaleDateString('en-US', { 
@@ -228,48 +240,13 @@ const StressDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Vital Signs Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-red-500 hover:shadow-md transition-shadow">
+        {/* Enhanced Sensor Data Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {/* MLX90614 Temperature Sensor Cards */}
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-500 hover:shadow-lg transition-all duration-300">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <Heart className="w-4 h-4 text-red-500" />
-                Heart Rate (ECG)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentData?.heart_rate || 0}
-                  <span className="text-sm text-gray-500 ml-1">BPM</span>
-                </div>
-                <p className="text-xs text-gray-500">AD8232 Sensor</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-500" />
-                Pulse Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentData?.heart_rate || 0}
-                  <span className="text-sm text-gray-500 ml-1">BPM</span>
-                </div>
-                <p className="text-xs text-gray-500">Real-time</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <Thermometer className="w-4 h-4 text-orange-500" />
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Thermometer className="w-4 h-4 text-red-500" />
                 Body Temperature
               </CardTitle>
             </CardHeader>
@@ -277,16 +254,122 @@ const StressDashboard: React.FC = () => {
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
                   {currentData?.temperature || 0}
-                  <span className="text-sm text-gray-500 ml-1">°C</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">°C</span>
                 </div>
-                <p className="text-xs text-gray-500">MLX90614</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">MLX90614 Non-contact</p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">±0.5°C accuracy</span>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-orange-500 hover:shadow-lg transition-all duration-300">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Thermometer className="w-4 h-4 text-orange-500" />
+                Ambient Temperature
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.ambient_temperature || 0}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">°C</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Environmental</p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">Room temperature</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AD8232 ECG Sensor Cards */}
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-600 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Heart className="w-4 h-4 text-red-600" />
+                Heart Rate (ECG)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.heart_rate || 0}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">BPM</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">AD8232 Sensor</p>
+                <div className="flex items-center gap-2">
+                  {currentData?.leads_off_detected ? (
+                    <XCircle className="w-3 h-3 text-red-500" />
+                  ) : (
+                    <CheckCircle className="w-3 h-3 text-green-500" />
+                  )}
+                  <span className="text-xs text-gray-600 dark:text-gray-300">
+                    {currentData?.leads_off_detected ? "Leads disconnected" : "Leads connected"}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-blue-500" />
+                ECG Signal
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.raw_ecg_signal || 0}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">mV</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Raw waveform</p>
+                <div className="flex items-center gap-2">
+                  {currentData?.arrhythmia_detected ? (
+                    <AlertCircle className="w-3 h-3 text-yellow-500" />
+                  ) : (
+                    <CheckCircle className="w-3 h-3 text-green-500" />
+                  )}
+                  <span className="text-xs text-gray-600 dark:text-gray-300">
+                    {currentData?.arrhythmia_detected ? "Irregular rhythm" : "Normal rhythm"}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-indigo-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-indigo-500" />
+                Heart Rate Variability
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.heart_rate_variability?.toFixed(1) || 0}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">ms</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Beat-to-beat variation</p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">Autonomic function</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* GSR Sensor Cards */}
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-purple-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                 <Zap className="w-4 h-4 text-purple-500" />
                 GSR Level
               </CardTitle>
@@ -295,9 +378,57 @@ const StressDashboard: React.FC = () => {
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
                   {currentData?.gsr_value || 0}
-                  <span className="text-sm text-gray-500 ml-1">Ω</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Ω</span>
                 </div>
-                <p className="text-xs text-gray-500">Conductance</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Skin conductance</p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">Emotional arousal</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-green-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Eye className="w-4 h-4 text-green-500" />
+                GSR Baseline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.gsr_baseline || 0}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Ω</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Calibrated reference</p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">Resting state</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-yellow-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-yellow-500" />
+                GSR Change
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.gsr_change || 0}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Δ</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">From baseline</p>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-300">Stress indicator</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -306,9 +437,9 @@ const StressDashboard: React.FC = () => {
         {/* Health Targets */}
         {userProfile && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="hover:shadow-md transition-shadow">
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                   <Moon className="w-4 h-4 text-indigo-500" />
                   Sleep Target
                 </CardTitle>
@@ -319,14 +450,14 @@ const StressDashboard: React.FC = () => {
                     {userProfile.sleep_target_hours || 8} hours
                   </div>
                   <Progress value={75} className="h-2" />
-                  <p className="text-xs text-gray-500">6/8 hours completed</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">6/8 hours completed</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow">
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                   <Droplets className="w-4 h-4 text-cyan-500" />
                   Water Intake
                 </CardTitle>
@@ -337,14 +468,14 @@ const StressDashboard: React.FC = () => {
                     {userProfile.water_intake_target || 2000} ml
                   </div>
                   <Progress value={60} className="h-2" />
-                  <p className="text-xs text-gray-500">1200/2000 ml today</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">1200/2000 ml today</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow">
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                   <Calculator className="w-4 h-4 text-emerald-500" />
                   BMI Status
                 </CardTitle>
@@ -360,7 +491,7 @@ const StressDashboard: React.FC = () => {
                 ) : (
                   <div className="space-y-1">
                     <div className="text-xl font-semibold text-gray-400">--</div>
-                    <p className="text-xs text-gray-500">Update profile</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Update profile</p>
                   </div>
                 )}
               </CardContent>
@@ -416,7 +547,7 @@ const StressDashboard: React.FC = () => {
 
         {/* High Stress Alert */}
         {stressStatus === "high" && (
-          <Card className="border-l-4 border-l-red-500 bg-red-50 dark:bg-red-950/30">
+          <Card className="bg-red-50/90 dark:bg-red-950/30 backdrop-blur-sm border-l-4 border-l-red-500">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-red-100 dark:bg-red-900/50 rounded-full">
