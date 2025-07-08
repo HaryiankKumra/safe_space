@@ -1,8 +1,10 @@
+
 "use client";
 import { useState } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ContactForm() {
   const [formData, setFormData] = useState({
@@ -14,27 +16,34 @@ export default function ContactForm() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setStatus("");
 
     try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      const { error } = await supabase
+        .from("contact_messages")
+        .insert([
+          {
+            full_name: formData.fullName,
+            email: formData.email,
+            subject: formData.subject,
+            message: formData.message,
+            status: "new",
+          },
+        ]);
 
-      if (res.ok) {
+      if (error) {
+        console.error(error);
+        setStatus("Something went wrong. Please try again.");
+      } else {
         setStatus("Message sent successfully!");
         setFormData({ fullName: "", email: "", subject: "", message: "" });
-      } else {
-        setStatus("Something went wrong. Please try again.");
       }
     } catch (error) {
       console.error(error);

@@ -42,6 +42,7 @@ const DatabaseDebugger: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [showCredentials, setShowCredentials] = useState(false);
+  const [credentials, setCredentials] = useState<Array<{email: string; name: string; password: string}>>([]);
 
   const addLog = (message: string) => {
     setLogs((prev) => [
@@ -191,12 +192,26 @@ const DatabaseDebugger: React.FC = () => {
     setLoading(false);
   };
 
+  const loadCredentials = async () => {
+    try {
+      const creds = await getSampleCredentials();
+      setCredentials(creds);
+    } catch (error) {
+      console.error("Failed to load credentials:", error);
+      setCredentials([]);
+    }
+  };
+
   useEffect(() => {
     checkStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const credentials = getSampleCredentials();
+  useEffect(() => {
+    if (showCredentials) {
+      loadCredentials();
+    }
+  }, [showCredentials]);
 
   return (
     <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
