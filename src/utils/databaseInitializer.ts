@@ -73,7 +73,7 @@ export const initializeDatabaseWithSampleData = async (
           return {
             success: false,
             error: healthError.message,
-          };
+          };  
         } else {
           console.log("✅ Health records inserted successfully.");
         }
@@ -220,21 +220,27 @@ export const clearAllData = async () => {
       };
     }
 
-    // Clear user's data from all tables
-    const tables = [
-      "health_records",
-      "biometric_data_enhanced", 
-      "sensor_data",
-      "stress_predictions",
-      "chat_history",
-      "daily_metrics",
-      "notifications"
-    ];
+    // Clear user's data from all tables explicitly to avoid TypeScript errors
+    await supabase.from("health_records").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from health_records");
 
-    for (const table of tables) {
-      await supabase.from(table).delete().eq("user_id", user.id);
-      console.log(`✅ Cleared data from ${table}`);
-    }
+    await supabase.from("biometric_data_enhanced").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from biometric_data_enhanced");
+
+    await supabase.from("sensor_data").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from sensor_data");
+
+    await supabase.from("stress_predictions").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from stress_predictions");
+
+    await supabase.from("chat_history").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from chat_history");
+
+    await supabase.from("daily_metrics").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from daily_metrics");
+
+    await supabase.from("notifications").delete().eq("user_id", user.id);
+    console.log("✅ Cleared data from notifications");
     
     console.log("✅ All user data cleared successfully.");
     return { success: true };
