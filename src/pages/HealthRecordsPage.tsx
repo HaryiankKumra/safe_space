@@ -482,7 +482,7 @@ const HealthRecordsPage: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-blue-300 font-medium">3. API Endpoint:</h4>
-                <p>POST to: <code className="text-purple-400 bg-slate-800 px-2 py-1 rounded">https://unwxteyecpgcvrhqqbgz.supabase.co/functions/v1/receive-sensor-data</code></p>
+                <p>POST to: <code className="text-purple-400 bg-slate-800 px-2 py-1 rounded">https://oknvpipzzgfufvqssauz.supabase.co/functions/v1/receive-sensor-data</code></p>
               </div>
               <div>
                 <h4 className="text-blue-300 font-medium">4. Data Format:</h4>
