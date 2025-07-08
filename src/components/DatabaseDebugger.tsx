@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ const DatabaseDebugger: React.FC = () => {
   };
 
   const checkStatus = async () => {
-    if (loading) return; // Prevent overlap
+    if (loading) return;
     setLoading(true);
     addLog("🔍 Performing comprehensive health check...");
 
@@ -119,15 +120,12 @@ const DatabaseDebugger: React.FC = () => {
       const result = await initializeDatabaseWithSampleData({ force: true });
       if (result.success) {
         addLog(`🎉 Database initialized successfully!`);
-        addLog(`👤 Users created: ${result.usersCreated}`);
-        addLog(`🩺 Health records: ${result.healthRecordsCreated}`);
-        addLog(`🧠 Stress data: ${result.stressDataCreated}`);
+        if (result.message) {
+          addLog(`📝 ${result.message}`);
+        }
         await checkStatus();
       } else {
         addLog(`❌ Initialization failed: ${result.error}`);
-        if (result.usingMockData) {
-          addLog("📝 Using mock authentication data.");
-        }
       }
     } catch (error) {
       const msg =

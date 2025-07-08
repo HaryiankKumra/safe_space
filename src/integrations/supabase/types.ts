@@ -14,7 +14,153 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      biometric_data_enhanced: {
+        Row: {
+          created_at: string | null
+          gsr_value: number | null
+          heart_rate: number | null
+          id: string
+          stress_level: string | null
+          stress_score: number | null
+          temperature: number | null
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          gsr_value?: number | null
+          heart_rate?: number | null
+          id?: string
+          stress_level?: string | null
+          stress_score?: number | null
+          temperature?: number | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          gsr_value?: number | null
+          heart_rate?: number | null
+          id?: string
+          stress_level?: string | null
+          stress_score?: number | null
+          temperature?: number | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      health_records: {
+        Row: {
+          condition: string
+          created_at: string | null
+          diagnosis_date: string | null
+          id: string
+          medications: string[] | null
+          notes: string | null
+          severity: string | null
+          status: string | null
+          symptoms: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          condition: string
+          created_at?: string | null
+          diagnosis_date?: string | null
+          id?: string
+          medications?: string[] | null
+          notes?: string | null
+          severity?: string | null
+          status?: string | null
+          symptoms?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          condition?: string
+          created_at?: string | null
+          diagnosis_date?: string | null
+          id?: string
+          medications?: string[] | null
+          notes?: string | null
+          severity?: string | null
+          status?: string | null
+          symptoms?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          activity_level: string | null
+          age: number | null
+          allergies: string[] | null
+          blood_type: string | null
+          created_at: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          height: number | null
+          id: string
+          medical_conditions: string[] | null
+          medications: string[] | null
+          preferred_notification_time: string | null
+          sleep_target_hours: number | null
+          stress_threshold_high: number | null
+          stress_threshold_low: number | null
+          stress_threshold_medium: number | null
+          updated_at: string | null
+          user_id: string
+          water_intake_target: number | null
+          weight: number | null
+        }
+        Insert: {
+          activity_level?: string | null
+          age?: number | null
+          allergies?: string[] | null
+          blood_type?: string | null
+          created_at?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          height?: number | null
+          id?: string
+          medical_conditions?: string[] | null
+          medications?: string[] | null
+          preferred_notification_time?: string | null
+          sleep_target_hours?: number | null
+          stress_threshold_high?: number | null
+          stress_threshold_low?: number | null
+          stress_threshold_medium?: number | null
+          updated_at?: string | null
+          user_id: string
+          water_intake_target?: number | null
+          weight?: number | null
+        }
+        Update: {
+          activity_level?: string | null
+          age?: number | null
+          allergies?: string[] | null
+          blood_type?: string | null
+          created_at?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          height?: number | null
+          id?: string
+          medical_conditions?: string[] | null
+          medications?: string[] | null
+          preferred_notification_time?: string | null
+          sleep_target_hours?: number | null
+          stress_threshold_high?: number | null
+          stress_threshold_low?: number | null
+          stress_threshold_medium?: number | null
+          updated_at?: string | null
+          user_id?: string
+          water_intake_target?: number | null
+          weight?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
