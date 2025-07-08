@@ -33,20 +33,20 @@ const IntroductionPage = () => {
 
   const teamMembers = [
     {
-      name: "Arjun Sharma",
-      role: "ML Engineer",
-      email: "arjun@stressguard.ai",
+      name: "Mrinal Seth",
+      role: "ML Engineer & review paper author ",
+      email: "mseth1_be23@thapar.edu",
       linkedin: "https://linkedin.com/in/arjun-sharma",
       photo:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "",
     },
     {
-      name: "Priya Patel",
-      role: "ML Engineer",
-      email: "priya@stressguard.ai",
-      linkedin: "https://linkedin.com/in/priya-patel",
+      name: "Haryiank Kumra",
+      role: "WebsiteDevekoper , Backend & ML Engineer,Hardware Engineer",
+      email: "hkumra_be23@thapar.edu",
+      linkedin: "https://linkedin.com/in/haryiank",
       photo:
-        "https://images.unsplash.com/photo-1494790108755-2616b332166c?w=150&h=150&fit=crop&crop=face",
+        "",
     },
     {
       name: "Rahul Singh",
@@ -481,7 +481,7 @@ const IntroductionPage = () => {
             <Card className="bg-white/50 dark:bg-slate-800/50 border-sky-200 dark:border-slate-700">
               <CardContent className="p-4 text-center">
                 <div className="text-blue-600 dark:text-blue-400 font-mono text-sm mb-2">
-                  PPG
+                  AD8232
                 </div>
                 <h4 className="text-slate-900 dark:text-white font-semibold mb-2">
                   Heart Rate
@@ -495,7 +495,7 @@ const IntroductionPage = () => {
             <Card className="bg-white/50 dark:bg-slate-800/50 border-sky-200 dark:border-slate-700">
               <CardContent className="p-4 text-center">
                 <div className="text-teal-600 dark:text-teal-400 font-mono text-sm mb-2">
-                  DS18B20
+                  MLX90614
                 </div>
                 <h4 className="text-slate-900 dark:text-white font-semibold mb-2">
                   Temperature
@@ -654,9 +654,9 @@ const IntroductionPage = () => {
                         Contact Info
                       </h3>
                       <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-                        Phone: +91 175 239 3021
+                        Phone: +91 7986520232
                         <br />
-                        Email: contact@stressguard.ai
+                        Email: hkumra_be23@thapar.edu
                         <br />
                         Support: 24/7 Available
                       </p>
@@ -676,36 +676,36 @@ const IntroductionPage = () => {
                       </h3>
                       <div className="space-y-3">
                         <a
-                          href="mailto:contact@stressguard.ai"
+                          href="mailto:hkumra_be23@thapar.edu"
                           className="block p-3 rounded-lg bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
                         >
                           <div className="text-sky-600 dark:text-sky-400 font-medium text-sm">
                             Research Collaboration
                           </div>
                           <div className="text-slate-500 dark:text-slate-400 text-xs">
-                            collaborate@stressguard.ai
+                            hkumra_be23@thapar.edu
                           </div>
                         </a>
                         <a
-                          href="mailto:support@stressguard.ai"
+                          href="mailto:hkumra_be23@thapar.edu"
                           className="block p-3 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors"
                         >
                           <div className="text-cyan-600 dark:text-cyan-400 font-medium text-sm">
                             Technical Support
                           </div>
                           <div className="text-slate-500 dark:text-slate-400 text-xs">
-                            support@stressguard.ai
+                            hkumra_be23@thapar.edu
                           </div>
                         </a>
                         <a
-                          href="mailto:partnerships@stressguard.ai"
+                          href="mailto:hkumra_be23@thapar.edu"
                           className="block p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
                         >
                           <div className="text-emerald-600 dark:text-emerald-400 font-medium text-sm">
                             Business Partnerships
                           </div>
                           <div className="text-slate-500 dark:text-slate-400 text-xs">
-                            partnerships@stressguard.ai
+                            hkumra_be23@thapar.edu
                           </div>
                         </a>
                       </div>
