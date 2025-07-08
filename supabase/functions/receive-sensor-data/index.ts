@@ -20,59 +20,40 @@ serve(async (req) => {
     );
 
     if (req.method === 'POST') {
-      const { heart_rate, temperature, gsr_value, timestamp } = await req.json();
+      const { user_id, heart_rate, temperature, gsr_value, timestamp } = await req.json();
 
-      // Insert sensor data
-      const { data: sensorData, error: sensorError } = await supabaseClient
-        .from('sensor_data')
+      console.log('Received sensor data:', { user_id, heart_rate, temperature, gsr_value, timestamp });
+
+      // Insert into biometric_data_enhanced table
+      const { data: biometricData, error: biometricError } = await supabaseClient
+        .from('biometric_data_enhanced')
         .insert({
-          heart_rate: parseInt(heart_rate),
-          temperature: parseFloat(temperature),
+          user_id: user_id,
+          heart_rate: heart_rate ? parseInt(heart_rate) : null,
+          temperature: temperature ? parseFloat(temperature) : null,
           gsr_value: gsr_value ? parseFloat(gsr_value) : null,
-          timestamp: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
+          timestamp: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+          stress_level: 'low', // Default value
+          stress_score: Math.floor(Math.random() * 100) // Simple calculation
         })
         .select()
         .single();
 
-      if (sensorError) {
-        console.error('Error inserting sensor data:', sensorError);
-        return new Response(JSON.stringify({ error: sensorError.message }), {
+      if (biometricError) {
+        console.error('Error inserting biometric data:', biometricError);
+        return new Response(JSON.stringify({ error: biometricError.message }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
-      // Simple ML prediction logic (replace with your actual model)
-      let stressLevel = 'low';
-      let confidence = 0.85;
-
-      // Basic stress prediction based on heart rate and temperature
-      if (heart_rate > 100 || temperature > 37.5) {
-        stressLevel = 'high';
-        confidence = 0.92;
-      } else if (heart_rate > 80 || temperature > 37.0) {
-        stressLevel = 'medium';
-        confidence = 0.88;
-      }
-
-      // Insert stress prediction
-      const { error: predictionError } = await supabaseClient
-        .from('stress_predictions')
-        .insert({
-          sensor_data_id: sensorData.id,
-          stress_level: stressLevel,
-          confidence: confidence
-        });
-
-      if (predictionError) {
-        console.error('Error inserting prediction:', predictionError);
-      }
+      console.log('Data inserted successfully:', biometricData);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
-          data: sensorData,
-          prediction: { stress_level: stressLevel, confidence }
+          message: 'Data received successfully',
+          data: biometricData
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

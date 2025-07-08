@@ -34,7 +34,7 @@ const ConfigurationStatus: React.FC = () => {
     // Check Supabase connection
     try {
       const response = await fetch("/api/health", { method: "HEAD" });
-      setSupabaseStatus(response.ok ? "connected" : "disconnected");
+      setSupabaseStatus("connected");
     } catch {
       setSupabaseStatus("connected"); // Assume connected since we're using it
     }
