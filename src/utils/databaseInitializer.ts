@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface InitializeOptions {
   force?: boolean;
   includeHealthRecords?: boolean;
+  includeSampleData?: boolean;
 }
 
 export const initializeDatabaseWithSampleData = async (
@@ -12,6 +13,7 @@ export const initializeDatabaseWithSampleData = async (
   const {
     force = false,
     includeHealthRecords = true,
+    includeSampleData = true,
   } = options;
 
   try {
@@ -78,6 +80,119 @@ export const initializeDatabaseWithSampleData = async (
       }
     }
 
+    if (includeSampleData) {
+      console.log("📊 Creating sample biometric data...");
+      
+      // Insert sample biometric data
+      const sampleBiometricData = [
+        {
+          user_id: user.id,
+          heart_rate: 72,
+          temperature: 36.5,
+          gsr_value: 0.45,
+          stress_level: "low",
+          stress_score: 25,
+          timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        },
+        {
+          user_id: user.id,
+          heart_rate: 85,
+          temperature: 36.8,
+          gsr_value: 0.62,
+          stress_level: "moderate",
+          stress_score: 55,
+          timestamp: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+        },
+        {
+          user_id: user.id,
+          heart_rate: 78,
+          temperature: 36.6,
+          gsr_value: 0.38,
+          stress_level: "low",
+          stress_score: 30,
+          timestamp: new Date().toISOString(), // now
+        }
+      ];
+
+      const { error: biometricError } = await supabase
+        .from("biometric_data_enhanced")
+        .insert(sampleBiometricData);
+
+      if (biometricError) {
+        console.error("❌ Failed to insert sample biometric data:", biometricError.message);
+      } else {
+        console.log("✅ Sample biometric data inserted successfully.");
+      }
+
+      // Insert sample sensor data
+      const sampleSensorData = [
+        {
+          user_id: user.id,
+          heart_rate: 72,
+          temperature: 36.5,
+          gsr_value: 0.45,
+          device_id: "ESP32_001",
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+        },
+        {
+          user_id: user.id,
+          heart_rate: 85,
+          temperature: 36.8,
+          gsr_value: 0.62,
+          device_id: "ESP32_001",
+          timestamp: new Date().toISOString(),
+        }
+      ];
+
+      const { error: sensorError } = await supabase
+        .from("sensor_data")
+        .insert(sampleSensorData);
+
+      if (sensorError) {
+        console.error("❌ Failed to insert sample sensor data:", sensorError.message);
+      } else {
+        console.log("✅ Sample sensor data inserted successfully.");
+      }
+
+      // Insert sample stress predictions
+      const samplePredictions = [
+        {
+          user_id: user.id,
+          stress_level: "low",
+          confidence: 0.85,
+          physiological_score: 0.3,
+          facial_score: 0.2,
+          combined_score: 0.25,
+          heart_rate: 72,
+          temperature: 36.5,
+          gsr_value: 0.45,
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+        },
+        {
+          user_id: user.id,
+          stress_level: "moderate",
+          confidence: 0.92,
+          physiological_score: 0.6,
+          facial_score: 0.5,
+          combined_score: 0.55,
+          heart_rate: 85,
+          temperature: 36.8,
+          gsr_value: 0.62,
+          timestamp: new Date().toISOString(),
+        }
+      ];
+
+      const { error: predictionError } = await supabase
+        .from("stress_predictions")
+        .insert(samplePredictions);
+
+      if (predictionError) {
+        console.error("❌ Failed to insert sample predictions:", predictionError.message);
+      } else {
+        console.log("✅ Sample stress predictions inserted successfully.");
+      }
+    }
+
     console.log("🎉 Database initialization completed!");
     return {
       success: true,
@@ -105,13 +220,23 @@ export const clearAllData = async () => {
       };
     }
 
-    // Clear user's health records
-    await supabase.from("health_records").delete().eq("user_id", user.id);
+    // Clear user's data from all tables
+    const tables = [
+      "health_records",
+      "biometric_data_enhanced", 
+      "sensor_data",
+      "stress_predictions",
+      "chat_history",
+      "daily_metrics",
+      "notifications"
+    ];
+
+    for (const table of tables) {
+      await supabase.from(table).delete().eq("user_id", user.id);
+      console.log(`✅ Cleared data from ${table}`);
+    }
     
-    // Clear user's biometric data
-    await supabase.from("biometric_data_enhanced").delete().eq("user_id", user.id);
-    
-    console.log("✅ User data cleared successfully.");
+    console.log("✅ All user data cleared successfully.");
     return { success: true };
   } catch (error) {
     console.error("❌ Failed to clear data:", error);

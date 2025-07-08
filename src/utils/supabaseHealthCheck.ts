@@ -14,6 +14,11 @@ const requiredTables = [
   "health_records", 
   "biometric_data_enhanced",
   "contact_messages",
+  "sensor_data",
+  "stress_predictions",
+  "chat_history",
+  "daily_metrics",
+  "notifications",
 ];
 
 export const performSupabaseHealthCheck = async (): Promise<HealthCheckResult> => {

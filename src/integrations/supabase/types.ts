@@ -50,6 +50,33 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_history: {
+        Row: {
+          id: string
+          is_user: boolean
+          message: string
+          session_id: string | null
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          is_user: boolean
+          message: string
+          session_id?: string | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          is_user?: boolean
+          message?: string
+          session_id?: string | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       contact_messages: {
         Row: {
           created_at: string | null
@@ -77,6 +104,60 @@ export type Database = {
           message?: string
           status?: string | null
           subject?: string
+        }
+        Relationships: []
+      }
+      daily_metrics: {
+        Row: {
+          avg_heart_rate: number | null
+          avg_stress_level: number | null
+          created_at: string | null
+          date: string
+          exercise_minutes: number | null
+          id: string
+          max_heart_rate: number | null
+          max_stress_level: number | null
+          min_heart_rate: number | null
+          min_stress_level: number | null
+          mood_rating: number | null
+          notes: string | null
+          sleep_hours: number | null
+          user_id: string | null
+          water_intake: number | null
+        }
+        Insert: {
+          avg_heart_rate?: number | null
+          avg_stress_level?: number | null
+          created_at?: string | null
+          date: string
+          exercise_minutes?: number | null
+          id?: string
+          max_heart_rate?: number | null
+          max_stress_level?: number | null
+          min_heart_rate?: number | null
+          min_stress_level?: number | null
+          mood_rating?: number | null
+          notes?: string | null
+          sleep_hours?: number | null
+          user_id?: string | null
+          water_intake?: number | null
+        }
+        Update: {
+          avg_heart_rate?: number | null
+          avg_stress_level?: number | null
+          created_at?: string | null
+          date?: string
+          exercise_minutes?: number | null
+          id?: string
+          max_heart_rate?: number | null
+          max_stress_level?: number | null
+          min_heart_rate?: number | null
+          min_stress_level?: number | null
+          mood_rating?: number | null
+          notes?: string | null
+          sleep_hours?: number | null
+          user_id?: string | null
+          water_intake?: number | null
         }
         Relationships: []
       }
@@ -119,6 +200,114 @@ export type Database = {
           symptoms?: string[] | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          created_at: string | null
+          id: string
+          message: string
+          priority: string | null
+          read: boolean | null
+          title: string
+          type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          message: string
+          priority?: string | null
+          read?: boolean | null
+          title: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          priority?: string | null
+          read?: boolean | null
+          title?: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      sensor_data: {
+        Row: {
+          device_id: string | null
+          gsr_value: number | null
+          heart_rate: number | null
+          id: string
+          temperature: number | null
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          device_id?: string | null
+          gsr_value?: number | null
+          heart_rate?: number | null
+          id?: string
+          temperature?: number | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          device_id?: string | null
+          gsr_value?: number | null
+          heart_rate?: number | null
+          id?: string
+          temperature?: number | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      stress_predictions: {
+        Row: {
+          combined_score: number | null
+          confidence: number | null
+          facial_score: number | null
+          gsr_value: number | null
+          heart_rate: number | null
+          id: string
+          physiological_score: number | null
+          stress_level: string | null
+          temperature: number | null
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          combined_score?: number | null
+          confidence?: number | null
+          facial_score?: number | null
+          gsr_value?: number | null
+          heart_rate?: number | null
+          id?: string
+          physiological_score?: number | null
+          stress_level?: string | null
+          temperature?: number | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          combined_score?: number | null
+          confidence?: number | null
+          facial_score?: number | null
+          gsr_value?: number | null
+          heart_rate?: number | null
+          id?: string
+          physiological_score?: number | null
+          stress_level?: string | null
+          temperature?: number | null
+          timestamp?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
