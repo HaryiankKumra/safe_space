@@ -77,8 +77,8 @@ const StressDashboard: React.FC = () => {
     if (user) {
       fetchUserProfile();
       fetchLatestData();
-      // Get username from email or use display name
-      const displayName = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+      // Get username from email
+      const displayName = user.email?.split('@')[0] || 'User';
       setUserName(displayName);
       const interval = setInterval(fetchLatestData, 3000);
       return () => clearInterval(interval);

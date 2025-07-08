@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,7 @@ interface UserProfile {
 }
 
 const SettingsPage: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
@@ -65,8 +64,8 @@ const SettingsPage: React.FC = () => {
     preferred_notification_time: null,
   });
 
-  // Get display name from user metadata or email
-  const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+  // Get display name from user email
+  const displayName = user?.email?.split('@')[0] || 'User';
 
   useEffect(() => {
     if (user) {
@@ -146,7 +145,7 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    await logout();
   };
 
   const calculateBMI = () => {
