@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Camera, CameraOff, AlertTriangle } from "lucide-react";
+import { Camera, CameraOff, AlertTriangle, Play, Square } from "lucide-react";
 
 interface CameraModuleProps {
   isActive: boolean;
@@ -14,12 +14,15 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentEmotion, setCurrentEmotion] = useState<string>('neutral');
   const [confidence, setConfidence] = useState<number>(0.85);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Only run camera logic when both isActive and cameraStarted are true
   useEffect(() => {
-    if (isActive) {
+    if (isActive && cameraStarted) {
       startCamera();
     } else {
       stopCamera();
@@ -28,7 +31,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
     return () => {
       stopCamera();
     };
-  }, [isActive]);
+  }, [isActive, cameraStarted]);
 
   const startCamera = async () => {
     try {
@@ -49,8 +52,8 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
         };
       }
 
-      // Simulate emotion detection
-      const emotionInterval = setInterval(() => {
+      // Start emotion detection simulation
+      intervalRef.current = setInterval(() => {
         const emotions = ['happy', 'sad', 'angry', 'surprised', 'neutral', 'calm'];
         const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
         const randomConfidence = 0.7 + Math.random() * 0.3;
@@ -60,7 +63,6 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
         onEmotionDetected(randomEmotion, randomConfidence);
       }, 3000);
 
-      return () => clearInterval(emotionInterval);
     } catch (err) {
       console.error('Camera error:', err);
       setError('Unable to access camera. Please check permissions.');
@@ -69,12 +71,21 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
   };
 
   const stopCamera = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
     setCameraActive(false);
+  };
+
+  const handleToggleCamera = () => {
+    setCameraStarted(!cameraStarted);
   };
 
   const getEmotionColor = (emotion: string) => {
@@ -103,14 +114,41 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
             </div>
             <span>Facial Expression Analysis</span>
           </div>
-          <Badge className={cameraActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}>
-            {cameraActive ? 'Active' : 'Inactive'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={cameraActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}>
+              {cameraActive ? 'Active' : 'Inactive'}
+            </Badge>
+            <Button
+              onClick={handleToggleCamera}
+              size="sm"
+              variant={cameraStarted ? "destructive" : "default"}
+              className="ml-2"
+            >
+              {cameraStarted ? (
+                <>
+                  <Square className="w-4 h-4 mr-1" />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-1" />
+                  Start
+                </>
+              )}
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
-          {error ? (
+          {!cameraStarted ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+              <div className="text-center">
+                <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Click "Start" to begin camera analysis</p>
+              </div>
+            </div>
+          ) : error ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
               <div className="text-center">
                 <AlertTriangle className="w-12 h-12 text-orange-500 mx-auto mb-2" />

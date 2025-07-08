@@ -24,12 +24,17 @@ import {
   BarChart3,
   Brain,
   User,
+  Bell,
+  Shield,
+  Database,
+  Zap,
+  Heart,
   TrendingUp
 } from "lucide-react";
 
 const navigationItems = [
   {
-    title: "Overview",
+    title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
     badge: null,
@@ -47,6 +52,21 @@ const navigationItems = [
     badge: "New",
   },
   {
+    title: "Health Records",
+    url: "/dashboard/health",
+    icon: FileText,
+    badge: null,
+  },
+  {
+    title: "Settings",
+    url: "/dashboard/settings",
+    icon: Settings,
+    badge: null,
+  },
+];
+
+const quickActions = [
+  {
     title: "AI Assistant",
     url: "/dashboard/chat",
     icon: MessageCircle,
@@ -59,21 +79,9 @@ const navigationItems = [
     badge: null,
   },
   {
-    title: "Health Records",
-    url: "/dashboard/health",
-    icon: FileText,
-    badge: null,
-  },
-  {
-    title: "Profile",
-    url: "/dashboard/profile",
-    icon: User,
-    badge: null,
-  },
-  {
-    title: "Settings",
-    url: "/dashboard/settings",
-    icon: Settings,
+    title: "Stress Alerts",
+    url: "/dashboard/alerts",
+    icon: Bell,
     badge: null,
   },
 ];
@@ -109,7 +117,7 @@ export function DashboardSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="text-slate-400 font-semibold">
-            Navigation
+            Main Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -139,6 +147,46 @@ export function DashboardSidebar() {
                                   ? "bg-green-500/20 text-green-400 border-green-500/30"
                                   : "bg-blue-500/20 text-blue-400 border-blue-500/30"
                               }`}
+                            >
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-slate-400 font-semibold">
+            Quick Actions
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {quickActions.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <NavLink
+                      to={item.url}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                          isActive
+                            ? "bg-blue-600 text-white"
+                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                        }`
+                      }
+                    >
+                      <item.icon className="w-5 h-5" />
+                      {state === "expanded" && (
+                        <>
+                          <span className="flex-1">{item.title}</span>
+                          {item.badge && (
+                            <Badge 
+                              className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30"
                             >
                               {item.badge}
                             </Badge>
