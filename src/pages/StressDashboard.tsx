@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +36,7 @@ import StressChatbot from "@/components/StressChatbot";
 import ESP32StatusCard from "@/components/ESP32StatusCard";
 import ConfigurationStatus from "@/components/ConfigurationStatus";
 import SignalChart from "@/components/SignalChart";
+import ECGChart from "@/components/ECGChart";
 
 interface BiometricData {
   heart_rate: number;
@@ -496,6 +496,19 @@ const StressDashboard: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* ECG Real-time Chart */}
+        {esp32Status.hasRecentData && (
+          <div className="grid grid-cols-1 gap-6">
+            <ECGChart
+              isActive={isMonitoring}
+              rawEcgSignal={currentData?.raw_ecg_signal}
+              heartRate={currentData?.heart_rate}
+              leadsOffDetected={currentData?.leads_off_detected}
+              arrhythmiaDetected={currentData?.arrhythmia_detected}
+            />
           </div>
         )}
 
