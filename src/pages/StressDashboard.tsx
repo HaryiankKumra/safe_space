@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
+  Brain,
 } from "lucide-react";
 import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
@@ -39,6 +41,7 @@ import SignalChart from "@/components/SignalChart";
 import ECGChart from "@/components/ECGChart";
 
 interface BiometricData {
+  id: string;
   heart_rate: number;
   temperature: number;
   ambient_temperature: number;
@@ -53,6 +56,7 @@ interface BiometricData {
   stress_level: string;
   stress_score: number;
   timestamp: string;
+  created_at: string;
 }
 
 interface UserProfile {
@@ -198,9 +202,14 @@ const StressDashboard: React.FC = () => {
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="space-y-2">
-              <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                Welcome back, {userName}! 👋
-              </h1>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500">
+                  <Brain className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+                  Welcome back, {userName}! 👋
+                </h1>
+              </div>
               <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
                 <div className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
@@ -212,7 +221,7 @@ const StressDashboard: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  <span>Last update: {currentData ? new Date(currentData.timestamp).toLocaleTimeString() : "Never"}</span>
+                  <span>Last update: {currentData ? new Date(currentData.timestamp || currentData.created_at).toLocaleTimeString() : "Never"}</span>
                 </div>
               </div>
             </div>
@@ -253,7 +262,7 @@ const StressDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentData?.temperature || 0}
+                  {currentData?.temperature?.toFixed(1) || "0.0"}
                   <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">°C</span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">MLX90614 Non-contact</p>
@@ -275,7 +284,7 @@ const StressDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentData?.ambient_temperature || 0}
+                  {currentData?.ambient_temperature?.toFixed(1) || "0.0"}
                   <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">°C</span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Environmental</p>
@@ -354,7 +363,7 @@ const StressDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentData?.heart_rate_variability?.toFixed(1) || 0}
+                  {currentData?.heart_rate_variability?.toFixed(1) || "0.0"}
                   <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">ms</span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Beat-to-beat variation</p>
@@ -377,7 +386,7 @@ const StressDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentData?.gsr_value || 0}
+                  {currentData?.gsr_value?.toFixed(0) || 0}
                   <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Ω</span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Skin conductance</p>

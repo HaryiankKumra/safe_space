@@ -16,7 +16,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, 
-  Heart, 
   MessageCircle, 
   FileText, 
   Settings, 
@@ -24,7 +23,8 @@ import {
   Camera,
   BarChart3,
   Brain,
-  User
+  User,
+  TrendingUp
 } from "lucide-react";
 
 const navigationItems = [
@@ -39,6 +39,12 @@ const navigationItems = [
     url: "/dashboard/monitoring",
     icon: Activity,
     badge: "Live",
+  },
+  {
+    title: "Analytics",
+    url: "/dashboard/analytics",
+    icon: BarChart3,
+    badge: "New",
   },
   {
     title: "AI Assistant",
@@ -56,12 +62,6 @@ const navigationItems = [
     title: "Health Records",
     url: "/dashboard/health",
     icon: FileText,
-    badge: null,
-  },
-  {
-    title: "Analytics",
-    url: "/dashboard/analytics",
-    icon: BarChart3,
     badge: null,
   },
   {
@@ -135,6 +135,8 @@ export function DashboardSidebar() {
                               className={`text-xs ${
                                 item.badge === "Live" 
                                   ? "bg-red-500/20 text-red-400 border-red-500/30" 
+                                  : item.badge === "New"
+                                  ? "bg-green-500/20 text-green-400 border-green-500/30"
                                   : "bg-blue-500/20 text-blue-400 border-blue-500/30"
                               }`}
                             >
