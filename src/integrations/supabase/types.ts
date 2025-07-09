@@ -185,6 +185,36 @@ export type Database = {
         }
         Relationships: []
       }
+      facial_analysis: {
+        Row: {
+          confidence: number
+          created_at: string
+          emotion: string
+          id: string
+          stress_level: number
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          confidence: number
+          created_at?: string
+          emotion: string
+          id?: string
+          stress_level: number
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          emotion?: string
+          id?: string
+          stress_level?: number
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       health_records: {
         Row: {
           condition: string

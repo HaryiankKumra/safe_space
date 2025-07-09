@@ -17,21 +17,12 @@ interface EmotionData {
   stressLevel: number;
 }
 
-interface FacialAnalysis {
-  id: string;
-  emotion: string;
-  confidence: number;
-  stress_level: number;
-  timestamp: string;
-}
-
 const CameraAnalysisPage: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string>('neutral');
   const [confidence, setConfidence] = useState<number>(0);
   const [stressLevel, setStressLevel] = useState<number>(0);
   const [emotionHistory, setEmotionHistory] = useState<EmotionData[]>([]);
-  const [analysisData, setAnalysisData] = useState<FacialAnalysis[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,11 +52,10 @@ const CameraAnalysisPage: React.FC = () => {
 
       if (error) throw error;
       if (data) {
-        setAnalysisData(data);
         // Convert to chart data
         const chartData = data.slice(0, 10).reverse().map(item => ({
           emotion: item.emotion,
-          confidence: item.confidence * 100,
+          confidence: item.confidence,
           timestamp: new Date(item.timestamp),
           stressLevel: item.stress_level,
         }));
