@@ -84,7 +84,7 @@ const SettingsPage: React.FC = () => {
         .from("user_profiles")
         .select("*")
         .eq("user_id", user.id)
-        .maybeSingle(); // Use maybeSingle instead of single
+        .maybeSingle();
 
       if (error) {
         console.error("❌ Error fetching profile:", error);
@@ -458,7 +458,7 @@ const SettingsPage: React.FC = () => {
                   type="number"
                   value={profile.stress_threshold_high || ""}
                   onChange={(e) =>
-                    setProfile({ ...profile, stress_threshold_high: parseInt e.target.value) || null })
+                    setProfile({ ...profile, stress_threshold_high: parseInt(e.target.value) || null })
                   }
                   className="bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600"
                 />
