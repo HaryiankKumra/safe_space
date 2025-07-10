@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,18 +78,21 @@ const SettingsPage: React.FC = () => {
     if (!user) return;
 
     try {
+      console.log("🔄 Fetching profile for user:", user.id);
+      
       const { data, error } = await supabase
         .from("user_profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error fetching profile:", error);
+      if (error) {
+        console.error("❌ Error fetching profile:", error);
         return;
       }
 
       if (data) {
+        console.log("✅ Profile found:", data);
         setProfile({
           age: data.age,
           weight: data.weight,
@@ -105,35 +109,80 @@ const SettingsPage: React.FC = () => {
           stress_threshold_high: data.stress_threshold_high,
           preferred_notification_time: data.preferred_notification_time,
         });
+      } else {
+        console.log("ℹ️ No profile found, using defaults");
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("❌ Error fetching profile:", error);
     }
   };
 
   const updateProfile = async () => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Please log in to update your profile",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .upsert({
-          user_id: user.id,
-          ...profile,
-          updated_at: new Date().toISOString(),
-        });
+      console.log("🔄 Updating profile for user:", user.id);
+      console.log("Profile data:", profile);
 
-      if (error) {
-        throw error;
+      // First, check if profile exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error("❌ Error checking existing profile:", checkError);
+        throw checkError;
       }
 
+      let result;
+      if (existingProfile) {
+        // Update existing profile
+        console.log("🔄 Updating existing profile");
+        result = await supabase
+          .from("user_profiles")
+          .update({
+            ...profile,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id)
+          .select()
+          .single();
+      } else {
+        // Insert new profile
+        console.log("🔄 Creating new profile");
+        result = await supabase
+          .from("user_profiles")
+          .insert({
+            user_id: user.id,
+            ...profile,
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+      }
+
+      if (result.error) {
+        console.error("❌ Profile operation failed:", result.error);
+        throw result.error;
+      }
+
+      console.log("✅ Profile saved successfully:", result.data);
       toast({
         title: "Success",
         description: "Profile updated successfully!",
       });
     } catch (error: any) {
-      console.error("Error updating profile:", error);
+      console.error("❌ Error updating profile:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update profile",
@@ -409,7 +458,7 @@ const SettingsPage: React.FC = () => {
                   type="number"
                   value={profile.stress_threshold_high || ""}
                   onChange={(e) =>
-                    setProfile({ ...profile, stress_threshold_high: parseInt(e.target.value) || null })
+                    setProfile({ ...profile, stress_threshold_high: parseInt e.target.value) || null })
                   }
                   className="bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600"
                 />

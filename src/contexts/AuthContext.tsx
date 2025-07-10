@@ -94,8 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               supabaseUser.user_metadata?.full_name || supabaseUser.email || "",
           });
 
-          // Fetch user profile
-          await fetchUserProfile(supabaseUser.id);
+          // Fetch user profile with a delay to avoid race conditions
+          setTimeout(() => {
+            if (mounted) {
+              fetchUserProfile(supabaseUser.id);
+            }
+          }, 100);
         } else {
           console.log("ℹ️ No active session");
         }
@@ -128,10 +132,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             supabaseUser.user_metadata?.full_name || supabaseUser.email || "",
         });
 
-        // Fetch profile in background
-        fetchUserProfile(supabaseUser.id).catch((error) => {
-          console.warn("⚠️ Auth state profile fetch failed:", error);
-        });
+        // Fetch profile with delay to prevent race conditions
+        setTimeout(() => {
+          if (mounted) {
+            fetchUserProfile(supabaseUser.id);
+          }
+        }, 100);
       } else {
         setUser(null);
         setProfile(null);
@@ -158,47 +164,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from("user_profiles")
         .select("*")
         .eq("user_id", userId)
-        .single();
-
-      if (error && error.code === "PGRST116") {
-        // Profile doesn't exist, create one
-        console.log("📝 Creating new profile for user:", userId);
-        const newProfile = {
-          user_id: userId,
-          stress_threshold_low: 30,
-          stress_threshold_medium: 60,
-          stress_threshold_high: 80,
-          sleep_target_hours: 8,
-          water_intake_target: 2000,
-        };
-
-        const { data: createdProfile, error: createError } = await supabase
-          .from("user_profiles")
-          .insert([newProfile])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error("❌ Failed to create profile:", createError);
-          throw createError;
-        }
-
-        setProfile(createdProfile);
-        console.log("✅ Profile created successfully");
-        return;
-      }
+        .maybeSingle();
 
       if (error) {
         console.error("❌ Profile fetch error:", error);
-        throw error;
+        return;
       }
 
       if (data) {
         setProfile(data);
         console.log("✅ Profile loaded successfully");
+      } else {
+        console.log("ℹ️ No profile found for user, will be created on first save");
       }
     } catch (error) {
-      console.error("❌ Failed to fetch/create user profile:", error);
+      console.error("❌ Failed to fetch user profile:", error);
       logError("Failed to fetch user profile", error);
     }
   };
@@ -306,20 +286,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) return { success: false, error: "Not authenticated" };
 
       console.log("🔄 Updating profile...");
-      const { data, error } = await supabase
+      
+      // Check if profile exists first
+      const { data: existingProfile, error: checkError } = await supabase
         .from("user_profiles")
-        .update(profileData)
+        .select("id")
         .eq("user_id", user.id)
-        .select()
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        console.error("❌ Profile update failed:", error);
-        return { success: false, error: getErrorMessage(error) };
+      if (checkError) {
+        console.error("❌ Error checking existing profile:", checkError);
+        return { success: false, error: getErrorMessage(checkError) };
       }
 
-      if (data) {
-        setProfile(data);
+      let result;
+      if (existingProfile) {
+        // Update existing profile
+        result = await supabase
+          .from("user_profiles")
+          .update(profileData)
+          .eq("user_id", user.id)
+          .select()
+          .single();
+      } else {
+        // Insert new profile
+        result = await supabase
+          .from("user_profiles")
+          .insert({
+            user_id: user.id,
+            ...profileData,
+          })
+          .select()
+          .single();
+      }
+
+      if (result.error) {
+        console.error("❌ Profile update failed:", result.error);
+        return { success: false, error: getErrorMessage(result.error) };
+      }
+
+      if (result.data) {
+        setProfile(result.data);
         console.log("✅ Profile updated successfully");
         return { success: true };
       }
