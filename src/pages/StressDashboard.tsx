@@ -25,6 +25,9 @@ import {
   AlertCircle,
   TrendingUp,
   Sparkles,
+  Users,
+  Target,
+  Trophy,
 } from "lucide-react";
 import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
@@ -59,6 +62,12 @@ const StressDashboard: React.FC = () => {
   const [stressLevel, setStressLevel] = useState(0.3);
   const [stressStatus, setStressStatus] = useState<"low" | "moderate" | "high">("low");
   const [isMonitoring, setIsMonitoring] = useState(true);
+  const [dailyStats, setDailyStats] = useState({
+    averageStress: 0,
+    peakStress: 0,
+    calmMinutes: 0,
+    sessionsToday: 0
+  });
   const [esp32Status, setEsp32Status] = useState({
     connected: false,
     deviceId: "AD8232_ECG_001",
@@ -68,22 +77,43 @@ const StressDashboard: React.FC = () => {
     hasRecentData: false,
   });
 
-  const signalQuality = {
-    bvp: 92,
-    eda: 88,
-    temp: 95,
-    hr: 91,
-  };
-
   useEffect(() => {
     if (user) {
       fetchLatestData();
+      fetchDailyStats();
       const displayName = user.email?.split('@')[0] || 'User';
       setUserName(displayName);
       const interval = setInterval(fetchLatestData, 3000);
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  const fetchDailyStats = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from("biometric_data_enhanced")
+        .select("stress_score, timestamp")
+        .gte("timestamp", `${today}T00:00:00`)
+        .lt("timestamp", `${today}T23:59:59`);
+
+      if (data && data.length > 0) {
+        const stressScores = data.map(d => d.stress_score || 0);
+        const averageStress = stressScores.reduce((a, b) => a + b, 0) / stressScores.length;
+        const peakStress = Math.max(...stressScores);
+        const calmMinutes = data.filter(d => (d.stress_score || 0) < 40).length * 3; // 3 min intervals
+        
+        setDailyStats({
+          averageStress: Math.round(averageStress),
+          peakStress: Math.round(peakStress),
+          calmMinutes,
+          sessionsToday: data.length
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching daily stats:", error);
+    }
+  };
 
   const fetchLatestData = async () => {
     try {
@@ -117,7 +147,6 @@ const StressDashboard: React.FC = () => {
           hasRecentData
         }));
 
-        // Get AI prediction when new data arrives
         if (hasRecentData && isMonitoring) {
           getPrediction(data);
         }
@@ -142,12 +171,47 @@ const StressDashboard: React.FC = () => {
     }
   };
 
-  const handleEmotionDetected = (emotion: string, confidence: number) => {
+  const handleEmotionDetected = async (emotion: string, confidence: number) => {
     console.log("Emotion detected:", emotion, confidence);
-    // Include emotion data in AI prediction
+    
+    // Save facial analysis data
+    if (user) {
+      try {
+        const stressScore = getEmotionStressScore(emotion);
+        const { error } = await supabase.from('facial_analysis').insert({
+          user_id: user.id,
+          emotion: emotion,
+          confidence: confidence,
+          stress_level: stressScore,
+        });
+
+        if (error) {
+          console.error('Error saving facial analysis:', error);
+        } else {
+          console.log('Facial analysis saved successfully');
+        }
+      } catch (error) {
+        console.error('Database error:', error);
+      }
+    }
+
     if (currentData && isMonitoring) {
       getPrediction(currentData, { emotion, confidence });
     }
+  };
+
+  const getEmotionStressScore = (emotion: string): number => {
+    const emotionStressMap: { [key: string]: number } = {
+      happy: 10,
+      calm: 5,
+      neutral: 20,
+      surprised: 40,
+      sad: 70,
+      angry: 90,
+      anxious: 85,
+      focused: 25
+    };
+    return emotionStressMap[emotion] || 30;
   };
 
   return (
@@ -242,6 +306,81 @@ const StressDashboard: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Daily Insights Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-500" />
+                Today's Average
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {dailyStats.averageStress}%
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Stress</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Daily average stress level</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-orange-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+                Peak Stress
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {dailyStats.peakStress}%
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">Max</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Highest stress today</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-green-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Heart className="w-4 h-4 text-green-500" />
+                Calm Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {dailyStats.calmMinutes}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">min</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Low stress periods</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-purple-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-purple-500" />
+                Sessions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {dailyStats.sessionsToday}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">today</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Monitoring sessions</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Essential Sensor Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -353,7 +492,12 @@ const StressDashboard: React.FC = () => {
             <StressMetrics
               stressLevel={stressLevel}
               stressStatus={stressStatus}
-              signalQuality={signalQuality}
+              signalQuality={{
+                bvp: 92,
+                eda: 88,
+                temp: 95,
+                hr: 91,
+              }}
               isMonitoring={isMonitoring}
             />
             <ESP32StatusCard status={esp32Status} />
