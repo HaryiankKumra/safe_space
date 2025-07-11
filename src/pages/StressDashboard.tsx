@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +24,6 @@ import {
   AlertCircle,
   TrendingUp,
   Sparkles,
-  Users,
   Target,
   Trophy,
 } from "lucide-react";
@@ -384,10 +382,10 @@ const StressDashboard: React.FC = () => {
 
         {/* Essential Sensor Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-600 hover:shadow-lg transition-all duration-300">
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-500 hover:shadow-lg transition-all duration-300">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                <Heart className="w-4 h-4 text-red-600" />
+                <Heart className="w-4 h-4 text-red-500" />
                 Heart Rate
               </CardTitle>
             </CardHeader>

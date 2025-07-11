@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Send, Bot, User, Sparkles, Heart, Brain } from "lucide-react";
+import { MessageCircle, Send, Bot, User, Sparkles, Heart, Brain, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -30,6 +30,7 @@ const AIAssistantPage: React.FC = () => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingData, setIsSendingData] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -111,6 +112,91 @@ const AIAssistantPage: React.FC = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendHealthData = async () => {
+    if (!user || isSendingData) return;
+
+    setIsSendingData(true);
+
+    try {
+      // Fetch latest 10 biometric readings
+      const { data: biometricData, error: biometricError } = await supabase
+        .from('biometric_data_enhanced')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // Fetch user profile with health conditions
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (biometricError || profileError) {
+        throw new Error('Failed to fetch health data');
+      }
+
+      // Create a comprehensive health summary
+      const healthSummary = `Here is my recent health data for analysis:
+
+**Recent Biometric Readings (Last 10):**
+${biometricData?.map((reading, index) => 
+  `${index + 1}. Heart Rate: ${reading.heart_rate || 'N/A'} BPM, Stress Score: ${reading.stress_score || 'N/A'}%, Temperature: ${reading.temperature || 'N/A'}°C, EDA: ${reading.gsr_value || 'N/A'}Ω, ECG Signal: ${reading.raw_ecg_signal || 'N/A'}mV (${new Date(reading.created_at).toLocaleString()})`
+).join('\n') || 'No recent readings available'}
+
+**Health Profile:**
+- Medical Conditions: ${profileData?.medical_conditions?.join(', ') || 'None specified'}
+- Current Medications: ${profileData?.medications?.join(', ') || 'None specified'}
+- Allergies: ${profileData?.allergies?.join(', ') || 'None specified'}
+- Age: ${profileData?.age || 'Not specified'}
+- Activity Level: ${profileData?.activity_level || 'Not specified'}
+- Stress Thresholds: Low: ${profileData?.stress_threshold_low || 30}%, Medium: ${profileData?.stress_threshold_medium || 60}%, High: ${profileData?.stress_threshold_high || 80}%
+
+Please analyze this data and explain why I might be experiencing stress based on my physiological readings and health conditions. Provide personalized recommendations for stress management considering my specific health profile.`;
+
+      // Send the health summary to AI
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        content: "📊 Sending my health data for personalized analysis...",
+        isUser: true,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
+      const { data, error } = await supabase.functions.invoke('stress-chatbot', {
+        body: { message: healthSummary }
+      });
+
+      if (error) throw error;
+
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: data.response || "Based on your health data, I can see patterns in your stress levels. Let me provide some personalized recommendations...",
+        isUser: false,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+
+      toast({
+        title: "Health Data Sent",
+        description: "Your physiological readings and health profile have been analyzed by AI.",
+      });
+
+    } catch (error) {
+      console.error('Health data error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send health data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingData(false);
     }
   };
 
@@ -208,6 +294,21 @@ const AIAssistantPage: React.FC = () => {
 
                 {/* Input */}
                 <div className="border-t border-slate-200 dark:border-slate-700 p-4">
+                  <div className="flex gap-2 mb-3">
+                    <Button
+                      onClick={handleSendHealthData}
+                      disabled={isSendingData || !user}
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+                      size="sm"
+                    >
+                      {isSendingData ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ) : (
+                        <Activity className="w-4 h-4 mr-2" />
+                      )}
+                      {isSendingData ? 'Analyzing...' : 'Analyze My Health Data'}
+                    </Button>
+                  </div>
                   <div className="flex gap-2">
                     <Textarea
                       value={inputValue}

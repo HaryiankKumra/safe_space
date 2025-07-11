@@ -1,579 +1,496 @@
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, BellRing, AlertTriangle, Clock, Settings, Trash2, Plus, Heart } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import {
+  Bell,
+  BellOff,
+  AlertTriangle,
+  Settings,
+  Volume2,
+  VolumeX,
+  Clock,
+  Heart,
+  Brain,
+  Zap,
+} from "lucide-react";
 
-interface StressAlert {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  priority: string;
-  read: boolean;
-  created_at: string;
-  action_url?: string;
-}
-
-interface AlertSettings {
+interface NotificationSettings {
   enabled: boolean;
-  threshold_low: number;
-  threshold_medium: number;
-  threshold_high: number;
-  notification_time: string;
-  email_enabled: boolean;
-  push_enabled: boolean;
+  soundEnabled: boolean;
+  stressThreshold: number;
+  heartRateThreshold: number;
+  frequency: number; // minutes between notifications
 }
 
 const StressAlertsPage: React.FC = () => {
-  const [alerts, setAlerts] = useState<StressAlert[]>([]);
-  const [settings, setSettings] = useState<AlertSettings>({
-    enabled: true,
-    threshold_low: 30,
-    threshold_medium: 60,
-    threshold_high: 80,
-    notification_time: '09:00',
-    email_enabled: true,
-    push_enabled: true,
-  });
-  const [loading, setLoading] = useState(true);
-  const [showNewAlert, setShowNewAlert] = useState(false);
-  const [newAlert, setNewAlert] = useState({
-    title: '',
-    message: '',
-    type: 'stress',
-    priority: 'normal',
-  });
-
   const { user } = useAuth();
   const { toast } = useToast();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [settings, setSettings] = useState<NotificationSettings>({
+    enabled: true,
+    soundEnabled: true,
+    stressThreshold: 70,
+    heartRateThreshold: 100,
+    frequency: 5,
+  });
+  const [loading, setLoading] = useState(true);
+  const [currentStressData, setCurrentStressData] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
-      loadAlerts();
-      loadSettings();
+      fetchNotifications();
+      fetchUserSettings();
+      fetchCurrentStressData();
+      
+      // Set up real-time monitoring
+      const interval = setInterval(() => {
+        checkStressLevels();
+      }, 30000); // Check every 30 seconds
+
+      return () => clearInterval(interval);
     }
   }, [user]);
 
-  const loadAlerts = async () => {
-    if (!user) return;
-    
+  const fetchNotifications = async () => {
     try {
       const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
 
       if (error) throw error;
+      setNotifications(data || []);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+
+  const fetchUserSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("stress_threshold_high, preferred_notification_time")
+        .eq("user_id", user?.id)
+        .single();
+
+      if (error) throw error;
+
       if (data) {
-        setAlerts(data);
+        setSettings(prev => ({
+          ...prev,
+          stressThreshold: data.stress_threshold_high || 70,
+        }));
       }
     } catch (error) {
-      console.error('Error loading alerts:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load alerts",
-        variant: "destructive",
-      });
+      console.error("Error fetching user settings:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSettings = async () => {
-    if (!user) return;
-    
+  const fetchCurrentStressData = async () => {
     try {
       const { data, error } = await supabase
-        .from('user_profiles')
-        .select('stress_threshold_low, stress_threshold_medium, stress_threshold_high, preferred_notification_time')
-        .eq('user_id', user.id)
+        .from("biometric_data_enhanced")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data) {
-        setSettings(prev => ({
-          ...prev,
-          threshold_low: data.stress_threshold_low || 30,
-          threshold_medium: data.stress_threshold_medium || 60,
-          threshold_high: data.stress_threshold_high || 80,
-          notification_time: data.preferred_notification_time || '09:00',
-        }));
+      if (error) throw error;
+      setCurrentStressData(data);
+    } catch (error) {
+      console.error("Error fetching current stress data:", error);
+    }
+  };
+
+  const checkStressLevels = async () => {
+    if (!settings.enabled || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("biometric_data_enhanced")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data) return;
+
+      const stressScore = data.stress_score || 0;
+      const heartRate = data.heart_rate || 0;
+
+      // Check if stress threshold is exceeded
+      if (stressScore >= settings.stressThreshold) {
+        await sendNotification(
+          "High Stress Alert",
+          `Your stress level is at ${stressScore}%. Consider taking a break and practicing relaxation techniques.`,
+          "high",
+          "stress"
+        );
+        
+        if (settings.soundEnabled) {
+          playAlertSound();
+        }
       }
+
+      // Check if heart rate threshold is exceeded
+      if (heartRate >= settings.heartRateThreshold) {
+        await sendNotification(
+          "Elevated Heart Rate",
+          `Your heart rate is ${heartRate} BPM. Take deep breaths and monitor your activity.`,
+          "medium",
+          "heart_rate"
+        );
+        
+        if (settings.soundEnabled) {
+          playAlertSound();
+        }
+      }
+
+      setCurrentStressData(data);
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error("Error checking stress levels:", error);
     }
   };
 
-  const saveSettings = async () => {
-    if (!user) return;
-    
+  const sendNotification = async (title: string, message: string, priority: string, type: string) => {
     try {
       const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          stress_threshold_low: settings.threshold_low,
-          stress_threshold_medium: settings.threshold_medium,
-          stress_threshold_high: settings.threshold_high,
-          preferred_notification_time: settings.notification_time,
-        });
-
-      if (error) throw error;
-      
-      toast({
-        title: "Settings Saved",
-        description: "Your alert settings have been updated",
-      });
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save settings",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const createAlert = async () => {
-    if (!user || !newAlert.title || !newAlert.message) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('notifications')
+        .from("notifications")
         .insert({
-          user_id: user.id,
-          title: newAlert.title,
-          message: newAlert.message,
-          type: newAlert.type,
-          priority: newAlert.priority,
+          user_id: user?.id,
+          title,
+          message,
+          priority,
+          type,
+          read: false,
         });
 
       if (error) throw error;
-      
-      setNewAlert({ title: '', message: '', type: 'stress', priority: 'normal' });
-      setShowNewAlert(false);
-      loadAlerts();
-      
+
+      // Show browser notification if permission granted
+      if (Notification.permission === "granted") {
+        new Notification(title, {
+          body: message,
+          icon: "/favicon.ico",
+        });
+      }
+
+      // Refresh notifications list
+      fetchNotifications();
+
       toast({
-        title: "Alert Created",
-        description: "Your stress alert has been created",
+        title: "Alert Sent",
+        description: message,
+        variant: priority === "high" ? "destructive" : "default",
       });
     } catch (error) {
-      console.error('Error creating alert:', error);
+      console.error("Error sending notification:", error);
+    }
+  };
+
+  const playAlertSound = () => {
+    // Create audio context and play bell sound
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+  };
+
+  const updateSettings = async (newSettings: Partial<NotificationSettings>) => {
+    const updatedSettings = { ...settings, ...newSettings };
+    setSettings(updatedSettings);
+
+    try {
+      // Update user profile with new thresholds
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({
+          stress_threshold_high: updatedSettings.stressThreshold,
+        })
+        .eq("user_id", user?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Settings Updated",
+        description: "Your notification preferences have been saved.",
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
       toast({
         title: "Error",
-        description: "Failed to create alert",
+        description: "Failed to update settings. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const markAsRead = async (alertId: string) => {
+  const requestNotificationPermission = async () => {
+    if ("Notification" in window) {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        toast({
+          title: "Notifications Enabled",
+          description: "You'll now receive browser notifications for stress alerts.",
+        });
+      }
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
-        .from('notifications')
+        .from("notifications")
         .update({ read: true })
-        .eq('id', alertId);
+        .eq("id", notificationId);
 
       if (error) throw error;
       
-      setAlerts(prev => prev.map(alert => 
-        alert.id === alertId ? { ...alert, read: true } : alert
-      ));
+      fetchNotifications();
     } catch (error) {
-      console.error('Error marking as read:', error);
-    }
-  };
-
-  const deleteAlert = async (alertId: string) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', alertId);
-
-      if (error) throw error;
-      
-      setAlerts(prev => prev.filter(alert => alert.id !== alertId));
-      
-      toast({
-        title: "Alert Deleted",
-        description: "The alert has been removed",
-      });
-    } catch (error) {
-      console.error('Error deleting alert:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete alert",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const triggerTestAlert = async () => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          title: 'Test Stress Alert',
-          message: 'This is a test alert to verify your notification settings are working properly.',
-          type: 'test',
-          priority: 'normal',
-        });
-
-      if (error) throw error;
-      
-      loadAlerts();
-      toast({
-        title: "Test Alert Sent",
-        description: "Check your notifications to verify settings",
-      });
-    } catch (error) {
-      console.error('Error sending test alert:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send test alert",
-        variant: "destructive",
-      });
+      console.error("Error marking notification as read:", error);
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'stress': return <AlertTriangle className="w-4 h-4" />;
-      case 'heart': return <Heart className="w-4 h-4" />;
-      case 'reminder': return <Clock className="w-4 h-4" />;
-      default: return <Bell className="w-4 h-4" />;
+      case "high": return "bg-red-100 text-red-800 border-red-200";
+      case "medium": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      default: return "bg-blue-100 text-blue-800 border-blue-200";
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500">
-                <Bell className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Stress Alerts</h1>
-                <p className="text-gray-600 dark:text-gray-300">Manage your stress notifications and thresholds</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-orange-500">
+              <Bell className="w-6 h-6 text-white" />
             </div>
-            <div className="flex gap-2">
-              <Button onClick={triggerTestAlert} variant="outline">
-                <BellRing className="w-4 h-4 mr-2" />
-                Test Alert
-              </Button>
-              <Button onClick={() => setShowNewAlert(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                New Alert
-              </Button>
-            </div>
+            <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400 bg-clip-text text-transparent">
+              Stress Alerts & Notifications
+            </h1>
           </div>
+          <p className="text-gray-600 dark:text-gray-300">
+            Monitor and receive alerts for elevated stress levels and heart rate
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Alert Settings */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                  <Settings className="w-5 h-5" />
-                  Alert Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">Enable Alerts</label>
-                  <Switch
-                    checked={settings.enabled}
-                    onCheckedChange={(enabled) => setSettings(prev => ({ ...prev, enabled }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">Low Stress Threshold</label>
-                  <div className="mt-2">
-                    <Slider
-                      value={[settings.threshold_low]}
-                      onValueChange={([value]) => setSettings(prev => ({ ...prev, threshold_low: value }))}
-                      max={100}
-                      step={5}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">{settings.threshold_low}% - Relaxed state</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Current Status */}
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="w-5 h-5 text-purple-600" />
+                Current Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentStressData ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <Zap className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Stress Level</p>
+                    <p className={`text-2xl font-bold ${
+                      (currentStressData.stress_score || 0) >= settings.stressThreshold 
+                        ? 'text-red-600' 
+                        : (currentStressData.stress_score || 0) >= 50 
+                          ? 'text-yellow-600' 
+                          : 'text-green-600'
+                    }`}>
+                      {currentStressData.stress_score || 0}%
+                    </p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <Heart className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Heart Rate</p>
+                    <p className={`text-2xl font-bold ${
+                      (currentStressData.heart_rate || 0) >= settings.heartRateThreshold 
+                        ? 'text-red-600' 
+                        : 'text-green-600'
+                    }`}>
+                      {currentStressData.heart_rate || 0} BPM
+                    </p>
                   </div>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">Medium Stress Threshold</label>
-                  <div className="mt-2">
-                    <Slider
-                      value={[settings.threshold_medium]}
-                      onValueChange={([value]) => setSettings(prev => ({ ...prev, threshold_medium: value }))}
-                      max={100}
-                      step={5}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">{settings.threshold_medium}% - Alert state</p>
-                  </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Brain className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 dark:text-gray-300">No recent data available</p>
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">High Stress Threshold</label>
-                  <div className="mt-2">
-                    <Slider
-                      value={[settings.threshold_high]}
-                      onValueChange={([value]) => setSettings(prev => ({ ...prev, threshold_high: value }))}
-                      max={100}
-                      step={5}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">{settings.threshold_high}% - High stress</p>
-                  </div>
+          {/* Notification Settings */}
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-600" />
+                Alert Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {settings.enabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                  <Label htmlFor="notifications-enabled">Enable Notifications</Label>
                 </div>
+                <Switch
+                  id="notifications-enabled"
+                  checked={settings.enabled}
+                  onCheckedChange={(checked) => updateSettings({ enabled: checked })}
+                />
+              </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">Daily Reminder Time</label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {settings.soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  <Label htmlFor="sound-enabled">Sound Alerts</Label>
+                </div>
+                <Switch
+                  id="sound-enabled"
+                  checked={settings.soundEnabled}
+                  onCheckedChange={(checked) => updateSettings({ soundEnabled: checked })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stress-threshold">Stress Alert Threshold</Label>
+                <div className="flex items-center gap-2">
                   <Input
-                    type="time"
-                    value={settings.notification_time}
-                    onChange={(e) => setSettings(prev => ({ ...prev, notification_time: e.target.value }))}
-                    className="mt-2"
+                    id="stress-threshold"
+                    type="number"
+                    min="50"
+                    max="100"
+                    value={settings.stressThreshold}
+                    onChange={(e) => updateSettings({ stressThreshold: parseInt(e.target.value) })}
+                    className="w-20"
                   />
+                  <span className="text-sm text-gray-600">%</span>
                 </div>
+              </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Email Notifications</label>
-                    <Switch
-                      checked={settings.email_enabled}
-                      onCheckedChange={(email_enabled) => setSettings(prev => ({ ...prev, email_enabled }))}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Push Notifications</label>
-                    <Switch
-                      checked={settings.push_enabled}
-                      onCheckedChange={(push_enabled) => setSettings(prev => ({ ...prev, push_enabled }))}
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="heart-rate-threshold">Heart Rate Alert Threshold</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="heart-rate-threshold"
+                    type="number"
+                    min="80"
+                    max="200"
+                    value={settings.heartRateThreshold}
+                    onChange={(e) => updateSettings({ heartRateThreshold: parseInt(e.target.value) })}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-gray-600">BPM</span>
                 </div>
+              </div>
 
-                <Button onClick={saveSettings} className="w-full">
-                  Save Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats */}
-            <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-sm text-gray-900 dark:text-white">Alert Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Total Alerts</span>
-                  <Badge variant="outline">{alerts.length}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Unread</span>
-                  <Badge className="bg-red-100 text-red-800 border-red-200">
-                    {alerts.filter(a => !a.read).length}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">High Priority</span>
-                  <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                    {alerts.filter(a => a.priority === 'high').length}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Alert List */}
-          <div className="lg:col-span-2">
-            <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-white">Recent Alerts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {alerts.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600 dark:text-gray-300">No alerts yet</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Alerts will appear here when stress thresholds are exceeded</p>
-                    </div>
-                  ) : (
-                    alerts.map((alert) => (
-                      <div
-                        key={alert.id}
-                        className={`p-4 rounded-lg border ${
-                          alert.read 
-                            ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700' 
-                            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3 flex-1">
-                            <div className="p-2 rounded-lg bg-white dark:bg-slate-700">
-                              {getTypeIcon(alert.type)}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-medium text-gray-900 dark:text-white">{alert.title}</h3>
-                                <Badge className={getPriorityColor(alert.priority)} variant="outline">
-                                  {alert.priority}
-                                </Badge>
-                                {!alert.read && (
-                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                    New
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{alert.message}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(alert.created_at).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            {!alert.read && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => markAsRead(alert.id)}
-                              >
-                                Mark Read
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => deleteAlert(alert.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <Button onClick={requestNotificationPermission} className="w-full">
+                Enable Browser Notifications
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* New Alert Modal */}
-        {showNewAlert && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
-              <CardHeader>
-                <CardTitle>Create New Alert</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Title</label>
-                  <Input
-                    value={newAlert.title}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Alert title"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Message</label>
-                  <Textarea
-                    value={newAlert.message}
-                    onChange={(e) => setNewAlert(prev => ({ ...prev, message: e.target.value }))}
-                    placeholder="Alert message"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Type</label>
-                  <Select value={newAlert.type} onValueChange={(type) => setNewAlert(prev => ({ ...prev, type }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="stress">Stress</SelectItem>
-                      <SelectItem value="heart">Heart Rate</SelectItem>
-                      <SelectItem value="reminder">Reminder</SelectItem>
-                      <SelectItem value="general">General</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Priority</label>
-                  <Select value={newAlert.priority} onValueChange={(priority) => setNewAlert(prev => ({ ...prev, priority }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={createAlert} className="flex-1">
-                    Create Alert
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowNewAlert(false)}
-                    className="flex-1"
+        {/* Notifications History */}
+        <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-green-600" />
+              Recent Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {notifications.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {notifications.map((notification) => (
+                  <div 
+                    key={notification.id} 
+                    className={`p-4 rounded-lg border transition-all duration-200 ${
+                      notification.read 
+                        ? 'bg-gray-50 dark:bg-gray-700 opacity-60' 
+                        : 'bg-white dark:bg-gray-600 shadow-sm'
+                    }`}
                   >
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className={getPriorityColor(notification.priority || 'normal')}>
+                            {notification.priority || 'normal'}
+                          </Badge>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            {notification.title}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(notification.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      {!notification.read && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => markAsRead(notification.id)}
+                        >
+                          Mark Read
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Bell className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 dark:text-gray-300">No notifications yet</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  You'll receive alerts when stress levels exceed your thresholds
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
