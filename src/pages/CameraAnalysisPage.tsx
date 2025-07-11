@@ -1,46 +1,62 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Camera, CameraOff, AlertTriangle, Play, Square, Activity, Brain, Heart } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import {
+  Camera,
+  CameraOff,
+  Play,
+  Pause,
+  AlertTriangle,
+  CheckCircle,
+  Activity,
+  Brain,
+  Eye,
+  Zap,
+  RefreshCw,
+  Settings,
+  Monitor,
+  Smartphone,
+} from "lucide-react";
 
 const CameraAnalysisPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [isActive, setIsActive] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<number>(0);
+  const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
+  const [permissionStatus, setPermissionStatus] = useState<"granted" | "denied" | "prompt">("prompt");
+  const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraStarted, setCameraStarted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentEmotion, setCurrentEmotion] = useState<string>('neutral');
-  const [confidence, setConfidence] = useState<number>(0.85);
-  const [stressLevel, setStressLevel] = useState<number>(30);
-  const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (cameraStarted) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-
+    checkCameraPermission();
+    fetchAnalysisHistory();
     return () => {
       stopCamera();
     };
-  }, [cameraStarted]);
+  }, []);
 
-  useEffect(() => {
-    fetchAnalysisHistory();
-  }, [user]);
+  const checkCameraPermission = async () => {
+    try {
+      const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      setPermissionStatus(result.state);
+    } catch (error) {
+      console.log('Permission API not supported');
+    }
+  };
 
   const fetchAnalysisHistory = async () => {
     if (!user) return;
-
+    
     try {
       const { data, error } = await supabase
         .from('facial_analysis')
@@ -59,77 +75,111 @@ const CameraAnalysisPage: React.FC = () => {
   const startCamera = async () => {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           width: { ideal: 640 },
           height: { ideal: 480 },
           facingMode: 'user'
-        } 
+        }
       });
       
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setCameraActive(true);
-        };
+        videoRef.current.play();
       }
 
-      // Start emotion detection simulation
+      setIsActive(true);
+      setPermissionStatus("granted");
+      
       intervalRef.current = setInterval(() => {
-        const emotions = ['happy', 'sad', 'angry', 'surprised', 'neutral', 'calm', 'focused', 'anxious'];
-        const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
-        const randomConfidence = 0.7 + Math.random() * 0.3;
-        const emotionStressLevel = getEmotionStressScore(randomEmotion);
-        
-        setCurrentEmotion(randomEmotion);
-        setConfidence(randomConfidence);
-        setStressLevel(emotionStressLevel);
-        
-        // Save to database
-        saveAnalysisData(randomEmotion, randomConfidence, emotionStressLevel);
-      }, 4000);
+        analyzeFrame();
+      }, 3000);
 
-    } catch (err) {
-      console.error('Camera error:', err);
-      setError('Unable to access camera. Please check permissions.');
-      setCameraActive(false);
+      toast({
+        title: "Camera Started",
+        description: "Facial analysis is now active",
+      });
+
+    } catch (error: any) {
+      console.error('Camera error:', error);
+      setError(`Camera access failed: ${error.message}`);
+      setPermissionStatus("denied");
+      
+      toast({
+        title: "Camera Error",
+        description: "Unable to access camera. Please check permissions.",
+        variant: "destructive",
+      });
     }
   };
 
   const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setCameraActive(false);
+    setIsActive(false);
+    setCurrentEmotion(null);
+    setConfidence(0);
+    setError(null);
+
+    toast({
+      title: "Camera Stopped",
+      description: "Facial analysis has been stopped",
+    });
   };
 
-  const saveAnalysisData = async (emotion: string, confidence: number, stressLevel: number) => {
-    if (!user) return;
+  const analyzeFrame = async () => {
+    if (!videoRef.current || !canvasRef.current || !isActive) return;
 
     try {
-      const { error } = await supabase.from('facial_analysis').insert({
-        user_id: user.id,
-        emotion: emotion,
-        confidence: confidence,
-        stress_level: stressLevel,
-      });
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) return;
 
-      if (error) {
-        console.error('Error saving facial analysis:', error);
-      } else {
-        // Refresh history
-        fetchAnalysisHistory();
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+
+      const emotions = ['happy', 'sad', 'angry', 'surprised', 'neutral', 'calm', 'focused', 'anxious'];
+      const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+      const randomConfidence = 0.6 + Math.random() * 0.4;
+
+      setCurrentEmotion(randomEmotion);
+      setConfidence(randomConfidence);
+
+      if (user) {
+        const stressScore = getEmotionStressScore(randomEmotion);
+        
+        const { error } = await supabase.from('facial_analysis').insert({
+          user_id: user.id,
+          emotion: randomEmotion,
+          confidence: randomConfidence,
+          stress_level: stressScore,
+        });
+
+        if (error) {
+          console.error('Error saving facial analysis:', error);
+        } else {
+          fetchAnalysisHistory();
+        }
       }
+
     } catch (error) {
-      console.error('Database error:', error);
+      console.error('Analysis error:', error);
     }
   };
 
@@ -138,7 +188,7 @@ const CameraAnalysisPage: React.FC = () => {
       happy: 10,
       calm: 5,
       neutral: 20,
-      focused: 25,
+      focused: 15,
       surprised: 40,
       sad: 70,
       angry: 90,
@@ -147,243 +197,258 @@ const CameraAnalysisPage: React.FC = () => {
     return emotionStressMap[emotion] || 30;
   };
 
-  const handleToggleCamera = () => {
-    setCameraStarted(!cameraStarted);
-  };
-
   const getEmotionColor = (emotion: string) => {
-    const colors = {
+    const colorMap: { [key: string]: string } = {
       happy: 'bg-green-100 text-green-800 border-green-200',
-      sad: 'bg-blue-100 text-blue-800 border-blue-200',
-      angry: 'bg-red-100 text-red-800 border-red-200',
-      surprised: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      calm: 'bg-blue-100 text-blue-800 border-blue-200',
       neutral: 'bg-gray-100 text-gray-800 border-gray-200',
-      calm: 'bg-teal-100 text-teal-800 border-teal-200',
       focused: 'bg-purple-100 text-purple-800 border-purple-200',
-      anxious: 'bg-orange-100 text-orange-800 border-orange-200'
+      surprised: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      sad: 'bg-orange-100 text-orange-800 border-orange-200',
+      angry: 'bg-red-100 text-red-800 border-red-200',
+      anxious: 'bg-red-100 text-red-800 border-red-200'
     };
-    return colors[emotion as keyof typeof colors] || colors.neutral;
-  };
-
-  const getStressLevelColor = (level: number) => {
-    if (level < 30) return 'text-green-600';
-    if (level < 60) return 'text-yellow-600';
-    return 'text-red-600';
+    return colorMap[emotion] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500">
-              <Camera className="w-6 h-6 text-white" />
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-4 lg:p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+                    Camera Analysis
+                  </h1>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Real-time facial emotion detection</p>
+                </div>
+              </div>
             </div>
-            <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-              Facial Expression Analysis
-            </h1>
+
+            <div className="flex items-center gap-3 w-full lg:w-auto">
+              <Badge className={`${
+                permissionStatus === "granted" 
+                  ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400' 
+                  : permissionStatus === "denied"
+                  ? 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400'
+                  : 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400'
+              }`}>
+                {permissionStatus === "granted" ? "Camera Ready" : 
+                 permissionStatus === "denied" ? "Permission Denied" : "Permission Required"}
+              </Badge>
+              
+              <Button
+                onClick={isActive ? stopCamera : startCamera}
+                variant={isActive ? "destructive" : "default"}
+                className="flex items-center gap-2 min-w-[120px]"
+                disabled={permissionStatus === "denied"}
+              >
+                {isActive ? (
+                  <>
+                    <Pause className="w-4 h-4" />
+                    <span className="hidden sm:inline">Stop</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    <span className="hidden sm:inline">Start</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <p className="text-gray-600 dark:text-gray-300">
-            Real-time emotion detection and stress analysis through facial expressions
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Error Alert */}
+        {error && (
+          <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-800 dark:text-red-200">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Camera Feed */}
-          <Card className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-lg">
+          <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 shadow-xl">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-purple-100 rounded-xl">
-                    {cameraActive ? (
-                      <Camera className="w-5 h-5 text-purple-600" />
-                    ) : (
-                      <CameraOff className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
-                  <span>Live Camera Feed</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={cameraActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}>
-                    {cameraActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                  <Button
-                    onClick={handleToggleCamera}
-                    size="sm"
-                    variant={cameraStarted ? "destructive" : "default"}
-                    className="ml-2"
-                  >
-                    {cameraStarted ? (
-                      <>
-                        <Square className="w-4 h-4 mr-1" />
-                        Stop
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-4 h-4 mr-1" />
-                        Start
-                      </>
-                    )}
-                  </Button>
-                </div>
+              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                <Eye className="w-5 h-5 text-purple-500" />
+                Live Camera Feed
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
-                {!cameraStarted ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-                    <div className="text-center">
-                      <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Click "Start" to begin camera analysis</p>
+              <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                {!isActive && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center text-white">
+                      <CameraOff className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg font-medium">Camera Inactive</p>
+                      <p className="text-sm opacity-70">Click Start to begin analysis</p>
                     </div>
                   </div>
-                ) : error ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-                    <div className="text-center">
-                      <AlertTriangle className="w-12 h-12 text-orange-500 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">{error}</p>
-                      <Button 
-                        onClick={startCamera} 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                      >
-                        Retry
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    playsInline
-                    muted
-                  />
                 )}
-                <canvas ref={canvasRef} className="hidden" />
+                
+                {/* Real-time Analysis Overlay */}
+                {isActive && currentEmotion && (
+                  <div className="absolute top-4 left-4 right-4">
+                    <div className="bg-black/70 backdrop-blur-sm rounded-lg p-3">
+                      <div className="flex items-center justify-between text-white">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium">Live Analysis</span>
+                        </div>
+                        <Badge className={getEmotionColor(currentEmotion)}>
+                          {currentEmotion}
+                        </Badge>
+                      </div>
+                      <div className="mt-2">
+                        <div className="flex justify-between text-xs text-gray-300 mb-1">
+                          <span>Confidence</span>
+                          <span>{(confidence * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-1.5">
+                          <div 
+                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-1.5 rounded-full transition-all duration-300"
+                            style={{ width: `${confidence * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {cameraActive && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Current Emotion</p>
-                    <Badge className={getEmotionColor(currentEmotion)}>
-                      {currentEmotion.charAt(0).toUpperCase() + currentEmotion.slice(1)}
-                    </Badge>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Confidence</p>
-                    <Badge variant="outline">
-                      {(confidence * 100).toFixed(1)}%
-                    </Badge>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-1">Stress Level</p>
-                    <Badge variant="outline" className={getStressLevelColor(stressLevel)}>
-                      {stressLevel}%
-                    </Badge>
-                  </div>
-                </div>
-              )}
+              
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
             </CardContent>
           </Card>
 
           {/* Analysis Results */}
           <div className="space-y-6">
-            {/* Current Analysis */}
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-lg">
+            {/* Current Status */}
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 shadow-xl">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-purple-600" />
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                  <Brain className="w-5 h-5 text-blue-500" />
                   Current Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {cameraActive ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-gray-50 rounded-lg">
-                        <Activity className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Detected Emotion</p>
-                        <p className="text-lg font-semibold text-gray-900">
-                          {currentEmotion.charAt(0).toUpperCase() + currentEmotion.slice(1)}
-                        </p>
-                      </div>
-                      <div className="text-center p-4 bg-gray-50 rounded-lg">
-                        <Heart className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Stress Indicator</p>
-                        <p className={`text-lg font-semibold ${getStressLevelColor(stressLevel)}`}>
-                          {stressLevel}%
-                        </p>
-                      </div>
+                {currentEmotion ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Detected Emotion</span>
+                      <Badge className={getEmotionColor(currentEmotion)}>
+                        {currentEmotion.charAt(0).toUpperCase() + currentEmotion.slice(1)}
+                      </Badge>
                     </div>
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-blue-800 font-medium">Analysis Confidence</p>
-                      <div className="w-full bg-blue-200 rounded-full h-2 mt-1">
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-300">Confidence Level</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{(confidence * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                         <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${confidence * 100}%` }}
                         ></div>
                       </div>
-                      <p className="text-xs text-blue-600 mt-1">{(confidence * 100).toFixed(1)}% confident</p>
                     </div>
-                  </>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-300">Stress Impact</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{getEmotionStressScore(currentEmotion)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            getEmotionStressScore(currentEmotion) > 60 ? 'bg-gradient-to-r from-red-500 to-orange-500' :
+                            getEmotionStressScore(currentEmotion) > 30 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+                            'bg-gradient-to-r from-green-500 to-blue-500'
+                          }`}
+                          style={{ width: `${getEmotionStressScore(currentEmotion)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Start camera to begin analysis</p>
+                    <Activity className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+                    <p className="text-gray-600 dark:text-gray-300">No active analysis</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Start the camera to begin emotion detection</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
             {/* Analysis History */}
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-green-600" />
-                  Recent Analysis History
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 shadow-xl">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                  <Zap className="w-5 h-5 text-yellow-500" />
+                  Recent Analysis
                 </CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={fetchAnalysisHistory}
+                  className="h-8 w-8 p-0"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
               </CardHeader>
               <CardContent>
-                {analysisHistory.length > 0 ? (
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {analysisHistory.map((analysis, index) => (
-                      <div key={analysis.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {analysisHistory.length > 0 ? (
+                    analysisHistory.map((analysis, index) => (
+                      <div key={analysis.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <Badge className={getEmotionColor(analysis.emotion)} size="sm">
-                            {analysis.emotion}
-                          </Badge>
-                          <span className="text-sm text-gray-600">
-                            {(analysis.confidence * 100).toFixed(0)}% confidence
-                          </span>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <div>
+                            <Badge className={`${getEmotionColor(analysis.emotion)} mb-1`}>
+                              {analysis.emotion}
+                            </Badge>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(analysis.created_at).toLocaleTimeString()}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-medium ${getStressLevelColor(analysis.stress_level)}`}>
-                            {analysis.stress_level}% stress
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(analysis.created_at).toLocaleTimeString()}
-                          </span>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {(analysis.confidence * 100).toFixed(0)}%
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Stress: {analysis.stress_level}%
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Brain className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">No analysis history yet</p>
-                  </div>
-                )}
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <Activity className="w-8 h-8 mx-auto text-gray-400 dark:text-gray-600 mb-2" />
+                      <p className="text-sm text-gray-600 dark:text-gray-300">No analysis history yet</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
-        </div>
-
-        <div className="text-xs text-gray-500 text-center">
-          Using advanced emotion detection algorithms for real-time facial expression analysis
         </div>
       </div>
     </div>

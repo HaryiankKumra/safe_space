@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,19 +38,12 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -106,6 +100,13 @@
     padding: 0;
     width: 100%;
     min-height: 100vh;
+    font-size: 14px;
+  }
+
+  @media (min-width: 640px) {
+    body {
+      font-size: 16px;
+    }
   }
 
   html {
@@ -120,6 +121,52 @@
     padding: 0;
     width: 100%;
     min-height: 100vh;
+  }
+
+  /* Mobile-first responsive design */
+  @media (max-width: 768px) {
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+    
+    h2 {
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+    }
+    
+    h3 {
+      font-size: 1.125rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  /* Ensure text remains readable in dark mode */
+  .dark {
+    color-scheme: dark;
+  }
+
+  .dark * {
+    border-color: hsl(var(--border));
+  }
+
+  /* Improved focus visibility for accessibility */
+  button:focus,
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Smooth transitions for theme switching */
+  * {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
 
   @keyframes heartbeat {
@@ -164,9 +211,16 @@
     border: 1px solid;
   }
 
+  @media (max-width: 768px) {
+    .cLine {
+      width: 60px;
+      height: 60px;
+    }
+  }
+
   .cLine1 {
     background-color: transparent;
-    border-color: transparent gray gray transparent;
+    border-color: transparent hsl(var(--border)) hsl(var(--border)) transparent;
     border-bottom-right-radius: 20px;
   }
 
@@ -174,24 +228,45 @@
     width: 20px;
     height: 150px;
     background-color: transparent;
-    border-color: gray gray transparent transparent;
+    border-color: hsl(var(--border)) hsl(var(--border)) transparent transparent;
     border-top-right-radius: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .cLine2 {
+      width: 15px;
+      height: 90px;
+    }
   }
 
   .cLine3 {
     width: 20px;
     height: 50px;
     background-color: transparent;
-    border-color: transparent gray gray transparent;
+    border-color: transparent hsl(var(--border)) hsl(var(--border)) transparent;
     border-bottom-right-radius: 20px;
     align-self: flex-end;
+  }
+
+  @media (max-width: 768px) {
+    .cLine3 {
+      width: 15px;
+      height: 30px;
+    }
   }
 
   .cLine4 {
     width: 50px;
     height: 100px;
     background-color: transparent;
-    border-color: transparent transparent gray transparent;
+    border-color: transparent transparent hsl(var(--border)) transparent;
+  }
+
+  @media (max-width: 768px) {
+    .cLine4 {
+      width: 30px;
+      height: 60px;
+    }
   }
 
   .heartbeat {
@@ -201,5 +276,56 @@
   /* Smooth scroll behavior */
   html {
     scroll-behavior: smooth;
+  }
+
+  /* Mobile sheet improvements */
+  @media (max-width: 768px) {
+    [data-vaul-drawer] {
+      touch-action: none;
+    }
+    
+    [data-vaul-drawer][data-vaul-drawer-direction="right"] {
+      right: 0;
+    }
+  }
+
+  /* Improved backdrop blur for mobile */
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  /* Better text contrast in dark mode */
+  .dark .text-gray-600 {
+    color: hsl(var(--muted-foreground));
+  }
+  
+  .dark .text-gray-500 {
+    color: hsl(215 20.2% 55.1%);
+  }
+  
+  .dark .text-gray-400 {
+    color: hsl(215 20.2% 45.1%);
+  }
+
+  /* Ensure proper contrast for badges in dark mode */
+  .dark .bg-green-100 {
+    background-color: hsl(142 76% 15%);
+  }
+  
+  .dark .bg-red-100 {
+    background-color: hsl(0 63% 15%);
+  }
+  
+  .dark .bg-yellow-100 {
+    background-color: hsl(45 93% 15%);
+  }
+  
+  .dark .bg-blue-100 {
+    background-color: hsl(214 95% 15%);
+  }
+  
+  .dark .bg-purple-100 {
+    background-color: hsl(270 95% 15%);
   }
 }

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, Send, Bot, User, Sparkles, Heart, Brain, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
   id: string;
@@ -215,18 +215,18 @@ Please analyze this data and explain why I might be experiencing stress based on
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-2">
             <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500">
-              <Bot className="w-8 h-8 text-white" />
+              <Bot className="w-6 lg:w-8 h-6 lg:h-8 text-white" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Assistant</h1>
-              <p className="text-gray-600 dark:text-gray-300">Your personal stress management companion</p>
+            <div className="flex-1">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">AI Assistant</h1>
+              <p className="text-sm lg:text-base text-gray-600 dark:text-gray-300">Your personal stress management companion</p>
             </div>
-            <Badge className="bg-green-100 text-green-800 border-green-200 ml-auto">
+            <Badge className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700">
               <Sparkles className="w-3 h-3 mr-1" />
               Active
             </Badge>
@@ -237,15 +237,15 @@ Please analyze this data and explain why I might be experiencing stress based on
           {/* Chat Interface */}
           <div className="lg:col-span-3">
             <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-xl">
-              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
-                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700 p-4 lg:p-6">
+                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white text-lg lg:text-xl">
                   <MessageCircle className="w-5 h-5 text-purple-500" />
                   Chat with AI Assistant
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 {/* Messages */}
-                <div className="h-96 overflow-y-auto p-4 space-y-4">
+                <div className="h-80 lg:h-96 overflow-y-auto p-4 space-y-4">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -257,13 +257,13 @@ Please analyze this data and explain why I might be experiencing stress based on
                         </div>
                       )}
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                           message.isUser
                             ? 'bg-blue-500 text-white rounded-br-none'
                             : 'bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-bl-none'
                         }`}
                       >
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                         <p className={`text-xs mt-1 ${message.isUser ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                           {message.timestamp.toLocaleTimeString()}
                         </p>
@@ -294,11 +294,11 @@ Please analyze this data and explain why I might be experiencing stress based on
 
                 {/* Input */}
                 <div className="border-t border-slate-200 dark:border-slate-700 p-4">
-                  <div className="flex gap-2 mb-3">
+                  <div className="flex flex-col sm:flex-row gap-2 mb-3">
                     <Button
                       onClick={handleSendHealthData}
                       disabled={isSendingData || !user}
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white w-full sm:w-auto"
                       size="sm"
                     >
                       {isSendingData ? (
@@ -315,13 +315,13 @@ Please analyze this data and explain why I might be experiencing stress based on
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="Ask me about stress management, breathing exercises, or wellness tips..."
-                      className="flex-1 min-h-[40px] max-h-32 resize-none"
+                      className="flex-1 min-h-[40px] max-h-32 resize-none text-sm"
                       disabled={isLoading}
                     />
                     <Button
                       onClick={handleSendMessage}
                       disabled={!inputValue.trim() || isLoading}
-                      className="bg-blue-500 hover:bg-blue-600 px-4"
+                      className="bg-blue-500 hover:bg-blue-600 px-3 lg:px-4"
                     >
                       <Send className="w-4 h-4" />
                     </Button>
@@ -334,16 +334,16 @@ Please analyze this data and explain why I might be experiencing stress based on
           {/* Quick Actions */}
           <div className="space-y-4">
             <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-sm text-gray-900 dark:text-white">Quick Prompts</CardTitle>
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm lg:text-base text-gray-900 dark:text-white">Quick Prompts</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="p-4 pt-0 space-y-2">
                 {quickPrompts.map((prompt, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
-                    className="w-full text-left justify-start h-auto py-2 px-3 text-xs"
+                    className="w-full text-left justify-start h-auto py-2 px-3 text-xs lg:text-sm whitespace-normal"
                     onClick={() => setInputValue(prompt)}
                   >
                     {prompt}
@@ -353,24 +353,24 @@ Please analyze this data and explain why I might be experiencing stress based on
             </Card>
 
             <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-sm text-gray-900 dark:text-white flex items-center gap-2">
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm lg:text-base text-gray-900 dark:text-white flex items-center gap-2">
                   <Heart className="w-4 h-4 text-red-500" />
                   Wellness Tips
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-xs text-gray-600 dark:text-gray-300">
-                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="font-medium text-blue-800 dark:text-blue-300">4-7-8 Breathing</p>
-                  <p>Inhale 4s, hold 7s, exhale 8s</p>
+              <CardContent className="p-4 pt-0 space-y-2 text-xs lg:text-sm text-gray-600 dark:text-gray-300">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="font-medium text-blue-800 dark:text-blue-300 text-xs lg:text-sm">4-7-8 Breathing</p>
+                  <p className="text-xs">Inhale 4s, hold 7s, exhale 8s</p>
                 </div>
-                <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="font-medium text-green-800 dark:text-green-300">Progressive Relaxation</p>
-                  <p>Tense and release muscle groups</p>
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="font-medium text-green-800 dark:text-green-300 text-xs lg:text-sm">Progressive Relaxation</p>
+                  <p className="text-xs">Tense and release muscle groups</p>
                 </div>
-                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <p className="font-medium text-purple-800 dark:text-purple-300">Mindfulness</p>
-                  <p>Focus on present moment awareness</p>
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <p className="font-medium text-purple-800 dark:text-purple-300 text-xs lg:text-sm">Mindfulness</p>
+                  <p className="text-xs">Focus on present moment awareness</p>
                 </div>
               </CardContent>
             </Card>
