@@ -19,12 +19,15 @@ import {
   Users,
   Award,
   TrendingUp,
+  Menu,
+  X,
 } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [currentFeature, setCurrentFeature] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const features = [
     {
@@ -64,6 +67,10 @@ const Index = () => {
     }
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
       {/* Navigation */}
@@ -79,6 +86,7 @@ const Index = () => {
               </span>
             </div>
             
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <Button
                 variant="ghost"
@@ -116,7 +124,78 @@ const Index = () => {
                 </div>
               )}
             </div>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMobileMenu}
+                className="text-gray-600 dark:text-gray-300"
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </Button>
+            </div>
           </div>
+
+          {/* Mobile Navigation Menu */}
+          {isMobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-200/50 dark:border-gray-700/50 py-4 space-y-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  navigate('/introduction');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                About
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  navigate('/how-it-works');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                How It Works
+              </Button>
+              {user ? (
+                <Button 
+                  onClick={() => {
+                    navigate('/dashboard');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                >
+                  Dashboard
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      navigate('/login');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start text-gray-600 dark:text-gray-300"
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      navigate('/signup');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  >
+                    Sign Up
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </nav>
 
