@@ -17,7 +17,7 @@ interface BackendPredictionResult {
   lastUpdated: Date | null;
 }
 
-const BACKEND_API_URL = 'http://13.60.86.154:8000/predict';
+const BACKEND_API_URL = 'https://stressmanage.duckdns.org/predict';
 
 export const useBackendPrediction = () => {
   const [result, setResult] = useState<BackendPredictionResult>({
