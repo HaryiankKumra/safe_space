@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { getErrorMessage, logError } from '@/utils/errorHandling';
 
 interface PredictionData {
-  data: number[][];
+  data: number[][][];
 }
 
 interface PredictionResponse {
@@ -42,7 +42,7 @@ export const useBackendPrediction = () => {
     try {
       // Take the last 20 readings and format for the API
       const last20Readings = sensorData.slice(-20);
-      const formattedData = last20Readings.map(reading => [
+      const formattedData: number[][] = last20Readings.map(reading => [
         reading.raw_ecg_signal || 0,
         reading.gsr_value || 0,
         reading.temperature || 0
