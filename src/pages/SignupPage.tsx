@@ -1,325 +1,286 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Monitor, Eye, EyeOff, Loader2 } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
 
-export default function SignupPage() {
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
+import { Activity, Eye, EyeOff, ArrowLeft, Check, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+const SignupPage = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signup, loginWithGoogle } = useAuth();
-  const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
+  const getPasswordStrength = (password: string) => {
+    let strength = 0;
+    const checks = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      numbers: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    };
+    
+    strength = Object.values(checks).filter(Boolean).length;
+    return { strength: (strength / 5) * 100, checks };
+  };
+
+  const { strength, checks } = getPasswordStrength(password);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Password mismatch",
-        description: "Passwords do not match",
-        variant: "destructive",
-      });
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive",
-      });
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      setLoading(false);
       return;
     }
-
-    setIsLoading(true);
 
     try {
-      const result = await signup(
-        formData.email,
-        formData.password,
-        formData.name,
-      );
-      if (result.success) {
-        toast({
-          title: "Account created successfully",
-          description: "Welcome to StressGuard AI!",
-        });
-        navigate("/dashboard");
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl
+        }
+      });
+
+      if (error) {
+        setError(error.message);
       } else {
-        toast({
-          title: "Signup failed",
-          description: result.error || "Failed to create account",
-          variant: "destructive",
-        });
+        setSuccess('Account created successfully! Please check your email to verify your account.');
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       }
-    } catch (error) {
-      toast({
-        title: "Signup failed",
-        description: "An error occurred. Please try again.",
-        variant: "destructive",
-      });
+    } catch (err) {
+      setError('An unexpected error occurred');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
-
-  const handleGoogleSignup = async () => {
-    setIsGoogleLoading(true);
-    try {
-      const result = await loginWithGoogle();
-      if (!result.success) {
-        toast({
-          title: "Google signup failed",
-          description: result.error || "Failed to signup with Google",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Google signup failed",
-        description: "An error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-slate-50 dark:from-slate-900 dark:via-sky-900 dark:to-slate-900 flex items-center justify-center p-6">
-      <div className="absolute top-6 right-6">
-        <ThemeToggle />
-      </div>
-
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-8">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sky-600 dark:text-sky-400 hover-scale"
-          >
-            <Monitor className="w-8 h-8" />
-            <span className="text-2xl font-bold">StressGuard AI</span>
-          </Link>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 sm:h-16 items-center justify-between">
+            <Link to="/" className="flex items-center space-x-2">
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+              <span className="text-lg sm:text-xl font-bold text-primary">StressMon</span>
+            </Link>
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                Already have an account?
+              </span>
+              <Link to="/login">
+                <Button variant="outline" size="sm" className="text-sm sm:text-base">
+                  Sign In
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
+      </header>
 
-        <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur border-sky-200 dark:border-slate-700 animate-scale-in">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-slate-900 dark:text-white">
-              Create Account
-            </CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-300">
-              Join StressGuard AI to start monitoring your stress levels
-            </CardDescription>
+      {/* Main Content */}
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8">
+        <Card className="w-full max-w-md mx-auto shadow-lg border-2">
+          <CardHeader className="space-y-3 sm:space-y-4 text-center pb-6">
+            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-xl sm:text-2xl font-bold">Create Account</CardTitle>
+              <CardDescription className="text-sm sm:text-base mt-2">
+                Start monitoring your stress levels today
+              </CardDescription>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleSignup} className="space-y-4">
+
+          <CardContent className="space-y-4 sm:space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {success && (
+              <Alert>
+                <Check className="h-4 w-4" />
+                <AlertDescription className="text-sm">{success}</AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleSignup} className="space-y-4 sm:space-y-5">
               <div className="space-y-2">
-                <Label
-                  htmlFor="name"
-                  className="text-slate-700 dark:text-slate-300"
-                >
-                  Full Name
-                </Label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Enter your full name"
-                  required
-                  className="bg-white dark:bg-slate-700 border-sky-200 dark:border-slate-600 transition-all duration-200 focus:scale-[1.02]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label
-                  htmlFor="email"
-                  className="text-slate-700 dark:text-slate-300"
-                >
-                  Email
-                </Label>
+                <Label htmlFor="email" className="text-sm sm:text-base">Email</Label>
                 <Input
                   id="email"
-                  name="email"
                   type="email"
-                  value={formData.email}
-                  onChange={handleChange}
                   placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-white dark:bg-slate-700 border-sky-200 dark:border-slate-600 transition-all duration-200 focus:scale-[1.02]"
+                  className="h-10 sm:h-11 text-sm sm:text-base"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label
-                  htmlFor="password"
-                  className="text-slate-700 dark:text-slate-300"
-                >
-                  Password
-                </Label>
+                <Label htmlFor="password" className="text-sm sm:text-base">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
-                    name="password"
                     type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Create a password (min. 6 characters)"
+                    placeholder="Create a password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="bg-white dark:bg-slate-700 border-sky-200 dark:border-slate-600 pr-10 transition-all duration-200 focus:scale-[1.02]"
+                    className="h-10 sm:h-11 text-sm sm:text-base pr-10"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent transition-transform duration-200 hover:scale-110"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                      <EyeOff className="w-4 h-4 text-slate-500" />
+                      <EyeOff className="h-4 w-4 text-gray-400" />
                     ) : (
-                      <Eye className="w-4 h-4 text-slate-500" />
+                      <Eye className="h-4 w-4 text-gray-400" />
                     )}
                   </Button>
                 </div>
+                
+                {password && (
+                  <div className="space-y-2 mt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Password strength</span>
+                      <span className="text-xs text-muted-foreground">
+                        {strength < 40 ? 'Weak' : strength < 80 ? 'Good' : 'Strong'}
+                      </span>
+                    </div>
+                    <Progress value={strength} className="h-2" />
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div className={`flex items-center gap-1 ${checks.length ? 'text-green-600' : 'text-gray-400'}`}>
+                        {checks.length ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        8+ characters
+                      </div>
+                      <div className={`flex items-center gap-1 ${checks.uppercase ? 'text-green-600' : 'text-gray-400'}`}>
+                        {checks.uppercase ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        Uppercase
+                      </div>
+                      <div className={`flex items-center gap-1 ${checks.lowercase ? 'text-green-600' : 'text-gray-400'}`}>
+                        {checks.lowercase ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        Lowercase
+                      </div>
+                      <div className={`flex items-center gap-1 ${checks.numbers ? 'text-green-600' : 'text-gray-400'}`}>
+                        {checks.numbers ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        Numbers
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
               <div className="space-y-2">
-                <Label
-                  htmlFor="confirmPassword"
-                  className="text-slate-700 dark:text-slate-300"
-                >
-                  Confirm Password
-                </Label>
+                <Label htmlFor="confirmPassword" className="text-sm sm:text-base">Confirm Password</Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
-                    name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
                     placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="bg-white dark:bg-slate-700 border-sky-200 dark:border-slate-600 pr-10 transition-all duration-200 focus:scale-[1.02]"
+                    className="h-10 sm:h-11 text-sm sm:text-base pr-10"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent transition-transform duration-200 hover:scale-110"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? (
-                      <EyeOff className="w-4 h-4 text-slate-500" />
+                      <EyeOff className="h-4 w-4 text-gray-400" />
                     ) : (
-                      <Eye className="w-4 h-4 text-slate-500" />
+                      <Eye className="h-4 w-4 text-gray-400" />
                     )}
                   </Button>
                 </div>
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-sky-600 hover:bg-sky-700 text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating account...
-                  </>
-                ) : (
-                  "Create Account"
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <X className="h-3 w-3" />
+                    Passwords do not match
+                  </p>
                 )}
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full h-10 sm:h-11 text-sm sm:text-base" 
+                disabled={loading || password !== confirmPassword}
+              >
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-slate-200 dark:border-slate-700" />
+            <div className="space-y-4">
+              <Separator />
+              
+              <div className="text-center space-y-2">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Already have an account?{' '}
+                  <Link to="/login" className="text-primary hover:underline font-medium">
+                    Sign in here
+                  </Link>
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  <Link to="/" className="text-primary hover:underline">
+                    ← Back to home
+                  </Link>
+                </p>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white dark:bg-slate-800 px-2 text-slate-500 dark:text-slate-400">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-slate-200 dark:border-slate-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              onClick={handleGoogleSignup}
-              disabled={isGoogleLoading}
-            >
-              {isGoogleLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
-                  </svg>
-                  Continue with Google
-                </>
-              )}
-            </Button>
-
-            <div className="mt-6 text-center">
-              <p className="text-slate-600 dark:text-slate-400">
-                Already have an account?{" "}
-                <Link
-                  to="/login"
-                  className="text-sky-600 dark:text-sky-400 hover:underline font-medium transition-colors duration-200"
-                >
-                  Sign in
-                </Link>
-              </p>
             </div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
-}
+};
+
+export default SignupPage;
