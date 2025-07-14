@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStressPrediction } from "@/hooks/useStressPrediction";
+import { useBackendPrediction } from "@/hooks/useBackendPrediction";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileNavbar } from "@/components/MobileNavbar";
 import {
@@ -33,6 +34,7 @@ import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
 import ESP32StatusCard from "@/components/ESP32StatusCard";
 import ECGChart from "@/components/ECGChart";
+import BackendPrediction from "@/components/BackendPrediction";
 
 interface BiometricData {
   id: string;
@@ -58,7 +60,9 @@ const StressDashboard: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { prediction, loading: predictionLoading, getPrediction } = useStressPrediction();
+  const { prediction: backendPrediction, loading: backendLoading, error: backendError, lastUpdated, sendPredictionRequest, clearError } = useBackendPrediction();
   const [currentData, setCurrentData] = useState<BiometricData | null>(null);
+  const [recentDataForBackend, setRecentDataForBackend] = useState<BiometricData[]>([]);
   const [userName, setUserName] = useState<string>("");
   const [stressLevel, setStressLevel] = useState(0.3);
   const [stressStatus, setStressStatus] = useState<"low" | "moderate" | "high">("low");
@@ -160,6 +164,24 @@ const StressDashboard: React.FC = () => {
           hasRecentData: false
         }));
       }
+
+      const { data: recentData, error: recentError } = await supabase
+        .from("biometric_data_enhanced")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(25);
+
+      if (recentData && recentData.length >= 20) {
+        setRecentDataForBackend(recentData);
+        
+        if (isMonitoring) {
+          console.log('Sending data to backend prediction...');
+          sendPredictionRequest(recentData);
+        }
+      } else {
+        console.log('Not enough data for backend prediction:', recentData?.length || 0);
+      }
+
     } catch (error) {
       console.error("Error fetching data:", error);
       setEsp32Status(prev => ({
@@ -213,6 +235,18 @@ const StressDashboard: React.FC = () => {
       focused: 25
     };
     return emotionStressMap[emotion] || 30;
+  };
+
+  const handleRetryBackendPrediction = () => {
+    if (recentDataForBackend.length >= 20) {
+      sendPredictionRequest(recentDataForBackend);
+    } else {
+      toast({
+        title: "Insufficient Data",
+        description: "Need at least 20 sensor readings for prediction.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -273,6 +307,16 @@ const StressDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Backend AI Prediction Display */}
+          <BackendPrediction
+            prediction={backendPrediction}
+            loading={backendLoading}
+            error={backendError}
+            lastUpdated={lastUpdated}
+            onRetry={handleRetryBackendPrediction}
+            onClearError={clearError}
+          />
 
           {/* AI Prediction Display */}
           {prediction && (
