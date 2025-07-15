@@ -35,6 +35,8 @@ import CameraModule from "@/components/CameraModule";
 import ESP32StatusCard from "@/components/ESP32StatusCard";
 import ECGChart from "@/components/ECGChart";
 import BackendPrediction from "@/components/BackendPrediction";
+import { useAIStressExplanation } from "@/hooks/useAIStressExplanation";
+import AIStressExplanation from "@/components/AIStressExplanation";
 
 interface BiometricData {
   id: string;
@@ -61,6 +63,7 @@ const StressDashboard: React.FC = () => {
   const isMobile = useIsMobile();
   const { prediction, loading: predictionLoading, getPrediction } = useStressPrediction();
   const { prediction: backendPrediction, loading: backendLoading, error: backendError, lastUpdated, sendPredictionRequest, clearError } = useBackendPrediction();
+  const { explanation, loading: aiLoading, error: aiError, lastUpdated: aiLastUpdated, generateExplanation, clearError: clearAIError } = useAIStressExplanation();
   const [currentData, setCurrentData] = useState<BiometricData | null>(null);
   const [recentDataForBackend, setRecentDataForBackend] = useState<BiometricData[]>([]);
   const [userName, setUserName] = useState<string>("");
@@ -154,6 +157,9 @@ const StressDashboard: React.FC = () => {
 
         if (hasRecentData && isMonitoring) {
           getPrediction(data);
+          
+          // Generate AI explanation when we have new data
+          generateAIExplanation(data);
         }
       } else {
         setEsp32Status(prev => ({
@@ -194,6 +200,44 @@ const StressDashboard: React.FC = () => {
     }
   };
 
+  const generateAIExplanation = async (vitals: BiometricData) => {
+    if (!user) return;
+
+    try {
+      // Fetch patient history
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError) {
+        console.warn('Could not fetch user profile for AI explanation:', profileError);
+      }
+
+      // Determine stress level from current data
+      const stressLevel = vitals.stress_score 
+        ? vitals.stress_score < 40 ? 'Low' 
+          : vitals.stress_score < 70 ? 'Moderate' 
+          : 'High'
+        : 'Unknown';
+
+      // Generate explanation with patient history and current vitals
+      await generateExplanation(
+        profileData || {},
+        {
+          heart_rate: vitals.heart_rate,
+          temperature: vitals.temperature,
+          gsr_value: vitals.gsr_value,
+          stress_score: vitals.stress_score,
+        },
+        stressLevel
+      );
+    } catch (error) {
+      console.error('Error generating AI explanation:', error);
+    }
+  };
+
   const handleEmotionDetected = async (emotion: string, confidence: number) => {
     console.log("Emotion detected:", emotion, confidence);
     
@@ -220,6 +264,18 @@ const StressDashboard: React.FC = () => {
 
     if (currentData && isMonitoring) {
       getPrediction(currentData, { emotion, confidence });
+    }
+  };
+
+  const handleRetryAIExplanation = () => {
+    if (currentData) {
+      generateAIExplanation(currentData);
+    } else {
+      toast({
+        title: "No Current Data",
+        description: "No physiological data available for analysis.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -307,6 +363,16 @@ const StressDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* AI Stress Explanation Display */}
+          <AIStressExplanation
+            explanation={explanation}
+            loading={aiLoading}
+            error={aiError}
+            lastUpdated={aiLastUpdated}
+            onRetry={handleRetryAIExplanation}
+            onClearError={clearAIError}
+          />
 
           {/* Backend AI Prediction Display */}
           <BackendPrediction
