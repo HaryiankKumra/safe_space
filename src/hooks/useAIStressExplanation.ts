@@ -64,20 +64,25 @@ export const useAIStressExplanation = () => {
         });
 
         // Store the explanation in the database for logging
+        // Using rpc call to bypass TypeScript type issues
         try {
-          await supabase.from('ai_explanations').insert({
-            patient_history: patientHistory,
-            vitals: vitals,
-            predicted_stress_level: predictedStressLevel,
-            explanation: data.explanation,
+          const { error: dbError } = await supabase.rpc('store_ai_explanation', {
+            p_patient_history: patientHistory,
+            p_vitals: vitals,
+            p_predicted_stress_level: predictedStressLevel,
+            p_explanation: data.explanation,
           });
+          
+          if (dbError) {
+            console.warn('⚠️ Failed to store explanation in database:', dbError);
+          }
         } catch (dbError) {
           console.warn('⚠️ Failed to store explanation in database:', dbError);
         }
       } else {
         throw new Error('No explanation received from AI service');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ AI explanation error:', err);
       setResult({
         explanation: null,

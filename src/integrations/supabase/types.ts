@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_explanations: {
+        Row: {
+          created_at: string
+          explanation: string
+          id: string
+          patient_history: Json | null
+          predicted_stress_level: string | null
+          user_id: string
+          vitals: Json | null
+        }
+        Insert: {
+          created_at?: string
+          explanation: string
+          id?: string
+          patient_history?: Json | null
+          predicted_stress_level?: string | null
+          user_id: string
+          vitals?: Json | null
+        }
+        Update: {
+          created_at?: string
+          explanation?: string
+          id?: string
+          patient_history?: Json | null
+          predicted_stress_level?: string | null
+          user_id?: string
+          vitals?: Json | null
+        }
+        Relationships: []
+      }
       biometric_data_enhanced: {
         Row: {
           ambient_temperature: number | null
