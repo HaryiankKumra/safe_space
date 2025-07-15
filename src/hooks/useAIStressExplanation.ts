@@ -65,15 +65,20 @@ export const useAIStressExplanation = () => {
 
         // Store the explanation in the database for logging
         try {
-          const { error: dbError } = await supabase.from('ai_explanations').insert({
-            patient_history: patientHistory,
-            vitals: vitals,
-            predicted_stress_level: predictedStressLevel,
-            explanation: data.explanation,
-          });
+          const { data: { user } } = await supabase.auth.getUser();
           
-          if (dbError) {
-            console.warn('⚠️ Failed to store explanation in database:', dbError);
+          if (user) {
+            const { error: dbError } = await supabase.from('ai_explanations').insert({
+              user_id: user.id,
+              patient_history: patientHistory,
+              vitals: vitals,
+              predicted_stress_level: predictedStressLevel,
+              explanation: data.explanation,
+            });
+            
+            if (dbError) {
+              console.warn('⚠️ Failed to store explanation in database:', dbError);
+            }
           }
         } catch (dbError) {
           console.warn('⚠️ Failed to store explanation in database:', dbError);
