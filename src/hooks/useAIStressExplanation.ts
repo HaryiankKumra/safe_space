@@ -68,13 +68,18 @@ export const useAIStressExplanation = () => {
           const { data: { user } } = await supabase.auth.getUser();
           
           if (user) {
-            const { error: dbError } = await supabase.from('ai_explanations').insert({
+            // Use type assertion to bypass the TypeScript type mismatch
+            const insertData = {
               user_id: user.id,
-              patient_history: patientHistory,
-              vitals: vitals,
+              patient_history: patientHistory as any,
+              vitals: vitals as any,
               predicted_stress_level: predictedStressLevel,
               explanation: data.explanation,
-            });
+            } as any;
+            
+            const { error: dbError } = await supabase
+              .from('ai_explanations')
+              .insert(insertData);
             
             if (dbError) {
               console.warn('⚠️ Failed to store explanation in database:', dbError);
