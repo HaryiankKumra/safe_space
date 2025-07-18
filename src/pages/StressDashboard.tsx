@@ -37,6 +37,7 @@ import ECGChart from "@/components/ECGChart";
 import BackendPrediction from "@/components/BackendPrediction";
 import { useAIStressExplanation } from "@/hooks/useAIStressExplanation";
 import AIStressExplanation from "@/components/AIStressExplanation";
+import CombinedStressResult from "@/components/CombinedStressResult";
 
 interface BiometricData {
   id: string;
@@ -84,6 +85,8 @@ const StressDashboard: React.FC = () => {
     i2cEnabled: false,
     hasRecentData: false,
   });
+  const [facialStressLevel, setFacialStressLevel] = useState<string | null>(null);
+  const [combinedLastUpdated, setCombinedLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -241,6 +244,11 @@ const StressDashboard: React.FC = () => {
   const handleEmotionDetected = async (emotion: string, confidence: number) => {
     console.log("Emotion detected:", emotion, confidence);
     
+    // Set facial stress level
+    const stressLevel = emotion === 'neutral' ? 'Not Stressed' : 'Stressed';
+    setFacialStressLevel(stressLevel);
+    setCombinedLastUpdated(new Date());
+    
     // Save facial analysis data
     if (user) {
       try {
@@ -372,6 +380,13 @@ const StressDashboard: React.FC = () => {
             lastUpdated={aiLastUpdated}
             onRetry={handleRetryAIExplanation}
             onClearError={clearAIError}
+          />
+
+          {/* Combined Stress Result Display */}
+          <CombinedStressResult
+            physiologicalStress={backendPrediction}
+            facialStress={facialStressLevel}
+            lastUpdated={combinedLastUpdated}
           />
 
           {/* Backend AI Prediction Display */}

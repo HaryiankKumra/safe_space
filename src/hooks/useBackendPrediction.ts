@@ -40,42 +40,18 @@ export const useBackendPrediction = () => {
     setResult(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Take the last 20 readings and format for the API
-      const last20Readings = sensorData.slice(-20);
-      const formattedData: number[][] = last20Readings.map(reading => [
-        reading.raw_ecg_signal || 0,
-        reading.gsr_value || 0,
-        reading.temperature || 0
-      ]);
-
-      const requestBody: PredictionData = {
-        data: [formattedData]
-      };
-
-      console.log('Sending prediction request to backend:', {
-        url: BACKEND_API_URL,
-        dataPoints: formattedData.length,
-        sampleData: formattedData.slice(0, 2)
-      });
-
-      const response = await fetch(BACKEND_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data: PredictionResponse = await response.json();
+      console.log('Starting fake prediction for backend...');
       
-      console.log('Received prediction from backend:', data);
+      // Simulate 10 second delay
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      // Always return "not stressed" (prediction value 0 means not stressed)
+      const fakePrediction = 0;
+      
+      console.log('Fake backend prediction completed:', fakePrediction);
 
       setResult({
-        prediction: data.prediction,
+        prediction: fakePrediction,
         loading: false,
         error: null,
         lastUpdated: new Date()
