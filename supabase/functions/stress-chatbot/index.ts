@@ -77,22 +77,57 @@ serve(async (req) => {
   }
 
   try {
-    const { message } = await req.json();
+    const { message, healthContext } = await req.json();
     console.log('📨 Received message:', message);
+    console.log('📊 Health context provided:', healthContext ? 'Yes' : 'No');
 
     // Try Gemini API first
     if (geminiApiKey) {
       try {
         console.log('🤖 Calling Gemini API...');
         
-        const systemPrompt = `You are a compassionate AI assistant specialized in stress management. Provide supportive, empathetic responses with practical techniques. Keep responses under 200 words.`;
+        // Build health context section if available
+        let healthSection = '';
+        if (healthContext) {
+          healthSection = `
+USER'S CURRENT HEALTH DATA (use this to provide personalized advice):
+- Heart Rate: ${healthContext.heartRate || 'N/A'} BPM
+- Stress Score: ${healthContext.stressScore || 'N/A'}%
+- Facial Emotion: ${healthContext.facialEmotion || 'N/A'} (${healthContext.facialConfidence || 'N/A'}% confidence)
+- Wearable Stress: ${healthContext.wearableStress || 'N/A'}%
+- Fusion Stress: ${healthContext.fusionStress || 'N/A'}%
+- Temperature: ${healthContext.temperature || 'N/A'}°C
+- SpO2: ${healthContext.spo2 || 'N/A'}%
+- EDA/GSR: ${healthContext.eda || 'N/A'}
+- Health Conditions: ${healthContext.healthConditions || 'None specified'}
+- Medications: ${healthContext.medications || 'None specified'}
+- Recent Trend: ${healthContext.recentTrend || 'Unknown'}
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
+Based on this data, provide relevant health insights and personalized stress management advice.
+`;
+        }
+        
+        const systemPrompt = `You are a compassionate AI health assistant specialized in stress management and wellness. You have access to the user's real-time biometric data from wearable sensors and facial emotion detection.
+
+${healthSection}
+
+GUIDELINES:
+- Analyze the user's health metrics to provide personalized advice
+- If stress levels are high, suggest immediate coping techniques
+- Reference their specific numbers when relevant (e.g., "I see your heart rate is elevated at X BPM")
+- Consider their facial emotion state in your responses
+- Be empathetic, supportive, and actionable
+- Keep responses concise but helpful (under 250 words)
+- If health data shows concerning patterns, gently recommend consulting a healthcare professional`;
+
+        // Use the latest Gemini 3 Flash Preview model
+        console.log('🤖 Calling Gemini 3 Flash Preview...');
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: systemPrompt + "\n\nUser: " + message }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
+            generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
           }),
         });
 
@@ -100,13 +135,13 @@ serve(async (req) => {
           const data = await response.json();
           const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (aiResponse) {
-            console.log('✅ Gemini response received');
+            console.log('✅ Gemini 3 Flash Preview response received');
             return new Response(JSON.stringify({ response: aiResponse }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           }
         }
-        console.warn('⚠️ Gemini API failed, using smart fallback');
+        console.warn(`⚠️ Gemini API failed (${response.status}), using smart fallback`);
       } catch (e) {
         console.warn('⚠️ Gemini error:', e.message);
       }

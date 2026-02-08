@@ -35,7 +35,7 @@ const navigationItems = [
     title: "Analytics",
     url: "/dashboard/analytics",
     icon: BarChart3,
-    badge: "New",
+    badge: null,
   },
   {
     title: "Health Records",

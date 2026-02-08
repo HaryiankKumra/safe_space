@@ -54,6 +54,7 @@ const AIAssistantPage: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageToSend = inputValue;
     setInputValue("");
     setIsLoading(true);
 
@@ -62,17 +63,71 @@ const AIAssistantPage: React.FC = () => {
       if (user) {
         await supabase.from('chat_history').insert({
           user_id: user.id,
-          message: inputValue,
+          message: messageToSend,
           is_user: true,
           session_id: crypto.randomUUID(),
         });
       }
 
-      // Call AI chatbot function
-      console.log('🤖 Calling stress-chatbot Edge Function with message:', inputValue);
+      // Fetch latest health context
+      let healthContext = null;
+      if (user) {
+        try {
+          // Get latest biometric reading (cast to any to bypass type issues)
+          const { data: biometricData } = await (supabase as any)
+            .from('biometric_data_enhanced')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          // Get user profile
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('medical_conditions, medications')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (biometricData && biometricData.length > 0) {
+            const latest = biometricData[0] as any;
+            // Calculate recent trend
+            let recentTrend = 'stable';
+            if (biometricData.length >= 3) {
+              const avgRecent = biometricData.slice(0, 3).reduce((sum: number, d: any) => sum + (d.stress_score || 0), 0) / 3;
+              const avgOlder = biometricData.slice(-2).reduce((sum: number, d: any) => sum + (d.stress_score || 0), 0) / (biometricData.length > 3 ? 2 : biometricData.length);
+              if (avgRecent > avgOlder + 10) recentTrend = 'increasing';
+              else if (avgRecent < avgOlder - 10) recentTrend = 'decreasing';
+            }
+
+            healthContext = {
+              heartRate: latest.heart_rate,
+              stressScore: latest.stress_score,
+              facialEmotion: latest.facial_emotion || 'unknown',
+              facialConfidence: latest.facial_confidence ? Math.round(latest.facial_confidence * 100) : null,
+              wearableStress: latest.wearable_stress_score,
+              fusionStress: latest.fusion_stress_score,
+              temperature: latest.temperature,
+              spo2: latest.spo2,
+              eda: latest.gsr_value,
+              healthConditions: profileData?.medical_conditions?.join(', ') || 'None',
+              medications: profileData?.medications?.join(', ') || 'None',
+              recentTrend: recentTrend
+            };
+            console.log('📊 Health context loaded:', healthContext);
+          } else {
+            console.log('📊 No biometric data found for user');
+          }
+        } catch (e) {
+          console.warn('Could not fetch health context:', e);
+        }
+      }
+
+      // Call AI chatbot function with health context
+      console.log('🤖 Calling stress-chatbot Edge Function with message:', messageToSend);
+      console.log('📊 Sending health context to AI:', healthContext);
       
       const { data, error } = await supabase.functions.invoke('stress-chatbot', {
-        body: { message: inputValue }
+        body: { message: messageToSend, healthContext }
       });
 
       if (error) {
@@ -128,8 +183,8 @@ const AIAssistantPage: React.FC = () => {
     setIsSendingData(true);
 
     try {
-      // Fetch latest 10 biometric readings
-      const { data: biometricData, error: biometricError } = await supabase
+      // Fetch latest 10 biometric readings (cast to any to bypass type issues)
+      const { data: biometricData, error: biometricError } = await (supabase as any)
         .from('biometric_data_enhanced')
         .select('*')
         .eq('user_id', user.id)
@@ -151,8 +206,8 @@ const AIAssistantPage: React.FC = () => {
       const healthSummary = `Here is my recent health data for analysis:
 
 **Recent Biometric Readings (Last 10):**
-${biometricData?.map((reading, index) => 
-  `${index + 1}. Heart Rate: ${reading.heart_rate || 'N/A'} BPM, Stress Score: ${reading.stress_score || 'N/A'}%, Temperature: ${reading.temperature || 'N/A'}°C, EDA: ${reading.gsr_value || 'N/A'}Ω, ECG Signal: ${reading.raw_ecg_signal || 'N/A'}mV (${new Date(reading.created_at).toLocaleString()})`
+${biometricData?.map((reading: any, index: number) => 
+  `${index + 1}. Heart Rate: ${reading.heart_rate || 'N/A'} BPM, Stress: ${reading.stress_score || 'N/A'}%, Facial: ${reading.facial_emotion || 'N/A'}, Temp: ${reading.temperature || 'N/A'}°C, EDA: ${reading.gsr_value || 'N/A'}Ω (${new Date(reading.created_at).toLocaleString()})`
 ).join('\n') || 'No recent readings available'}
 
 **Health Profile:**

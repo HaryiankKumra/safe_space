@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileNavbar } from "@/components/MobileNavbar";
+import { toast } from "@/hooks/use-toast";
 import {
   Heart,
   Thermometer,
@@ -22,6 +24,8 @@ import {
   Frown,
   Meh,
   Camera,
+  FlaskConical,
+  Loader2,
 } from "lucide-react";
 import CameraModule from "@/components/CameraModule";
 
@@ -46,8 +50,12 @@ const StressDashboard: React.FC = () => {
   const [overallStress, setOverallStress] = useState<number>(0);
   const [facialEmotion, setFacialEmotion] = useState<string>("neutral");
   const [facialConfidence, setFacialConfidence] = useState<number>(0);
+  const [wearableStress, setWearableStress] = useState<number>(0);
+  const [wearableResult, setWearableResult] = useState<string>("--");
+  const [fusionStress, setFusionStress] = useState<number>(0);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isTestingWesad, setIsTestingWesad] = useState(false);
   const [dailyStats, setDailyStats] = useState({
     averageStress: 0,
     readings: 0
@@ -121,9 +129,29 @@ const StressDashboard: React.FC = () => {
     setFacialEmotion(emotion);
     setFacialConfidence(confidence);
     
+    // Update fusion stress
+    const facialStress = getEmotionStressScore(emotion);
+    const newFusion = Math.round((facialStress * 0.4) + (wearableStress * 0.6));
+    setFusionStress(newFusion);
+    
     if (user) {
       try {
         const stressScore = getEmotionStressScore(emotion);
+        
+        // Save to biometric_data_enhanced with facial data for AI chatbot
+        await (supabase as any).from('biometric_data_enhanced').insert({
+          user_id: user.id,
+          facial_emotion: emotion,
+          facial_confidence: confidence,
+          stress_score: stressScore,
+          fusion_stress_score: newFusion,
+          stress_level: stressScore > 60 ? 'high' : stressScore > 30 ? 'medium' : 'low',
+          timestamp: new Date().toISOString(),
+        });
+        
+        console.log('📊 Saved facial data to biometric_data_enhanced:', { emotion, confidence, stressScore, fusionStress: newFusion });
+        
+        // Also save to facial_analysis for historical tracking
         await (supabase as any).from('facial_analysis').insert({
           user_id: user.id,
           emotion: emotion,
@@ -133,6 +161,97 @@ const StressDashboard: React.FC = () => {
       } catch (error) {
         console.error("Error saving facial analysis:", error);
       }
+    }
+  };
+
+  // Generate random sensor data and test WESAD API
+  const handleTestWesad = async () => {
+    setIsTestingWesad(true);
+    
+    try {
+      // Generate random sensor data
+      const randomData = Array.from({ length: 10 }, () => ({
+        raw_ecg_signal: 0.3 + Math.random() * 0.8,
+        gsr_value: 200 + Math.random() * 600,
+        temperature: 35.5 + Math.random() * 3,
+      }));
+      
+      const heartRate = Math.round(60 + Math.random() * 80);
+      const temp = randomData[0].temperature;
+      const gsr = randomData[0].gsr_value;
+      const ecg = randomData[0].raw_ecg_signal;
+      
+      console.log('🧪 Sending test data to WESAD:', randomData);
+      
+      // Call WESAD proxy
+      const { data, error } = await supabase.functions.invoke('wearable-stress-proxy', {
+        body: { sensorData: randomData },
+      });
+      
+      if (error) throw error;
+      
+      console.log('✅ WESAD response:', data);
+      
+      // Update wearable stress state
+      const isStressed = data.prediction === 1;
+      const stressValue = isStressed ? 75 : 25;
+      setWearableStress(stressValue);
+      setWearableResult(data.stress_level || (isStressed ? 'Stressed' : 'Not Stressed'));
+      
+      // Update fusion stress
+      const facialStress = getEmotionStressScore(facialEmotion);
+      const newFusion = Math.round((facialStress * 0.4) + (stressValue * 0.6));
+      setFusionStress(newFusion);
+      
+      // Calculate overall stress score
+      const stressScore = Math.round((stressValue + facialStress) / 2);
+      
+      // Insert into database with facial + wearable data
+      await (supabase as any).from('biometric_data_enhanced').insert({
+        user_id: user?.id,
+        heart_rate: heartRate,
+        temperature: Number(temp.toFixed(1)),
+        gsr_value: Number(gsr.toFixed(0)),
+        raw_ecg_signal: Number(ecg.toFixed(2)),
+        facial_emotion: facialEmotion,
+        facial_confidence: facialConfidence,
+        wearable_stress_score: stressValue,
+        fusion_stress_score: newFusion,
+        stress_level: isStressed ? 'high' : 'low',
+        stress_score: stressScore,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Update current data display
+      setCurrentData({
+        id: 'test',
+        heart_rate: heartRate,
+        temperature: temp,
+        gsr_value: gsr,
+        raw_ecg_signal: ecg,
+        stress_level: isStressed ? 'high' : 'low',
+        stress_score: stressScore,
+        timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      });
+      setOverallStress(stressScore);
+      setIsConnected(true);
+      setLastUpdate(new Date());
+      
+      toast({
+        title: "WESAD Test Complete",
+        description: `Result: ${data.stress_level} (Confidence: ${((data.confidence || 0.7) * 100).toFixed(0)}%)`,
+      });
+      
+    } catch (error: any) {
+      console.error('WESAD test error:', error);
+      toast({
+        title: "Test Failed",
+        description: error.message || "Could not complete WESAD test",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingWesad(false);
     }
   };
 
@@ -316,27 +435,71 @@ const StressDashboard: React.FC = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Brain className="w-5 h-5 text-purple-500" />
-                  Current Emotion
+                  Fusion Stress Analysis
                 </CardTitle>
-                <CardDescription>AI-detected expression</CardDescription>
+                <CardDescription>Combined facial + wearable detection</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="flex flex-col items-center justify-center py-8">
+                <div className="flex flex-col items-center justify-center py-4">
                   <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
                     {getEmotionIcon(facialEmotion)}
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white capitalize mb-2">{facialEmotion}</h3>
                   <Badge variant="outline" className="mb-4">{(facialConfidence * 100).toFixed(0)}% confidence</Badge>
-                  <div className="w-full max-w-xs">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Relaxed</span>
-                      <span>Stressed</span>
+                  
+                  {/* Fusion Stress Display */}
+                  <div className="w-full max-w-xs space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Facial Stress</span>
+                        <span>{getEmotionStressScore(facialEmotion)}%</span>
+                      </div>
+                      <Progress value={getEmotionStressScore(facialEmotion)} className="h-2" />
                     </div>
-                    <Progress value={getEmotionStressScore(facialEmotion)} className="h-2" />
+                    
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Wearable Stress</span>
+                        <span>{wearableStress}%</span>
+                      </div>
+                      <Progress value={wearableStress} className="h-2" />
+                    </div>
+                    
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between text-sm font-medium mb-1">
+                        <span className="text-purple-600 dark:text-purple-400">Fusion Stress</span>
+                        <span className={`font-bold ${getStressColor(fusionStress)}`}>{fusionStress}%</span>
+                      </div>
+                      <Progress value={fusionStress} className="h-3" />
+                      <p className="text-xs text-gray-500 mt-1 text-center">
+                        (40% facial + 60% wearable)
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
-                    Facial stress: {getEmotionStressScore(facialEmotion)}%
-                  </p>
+                  
+                  <div className="mt-3 text-xs text-gray-500">
+                    WESAD: <span className="font-medium">{wearableResult}</span>
+                  </div>
+                  
+                  {/* Test WESAD Button */}
+                  <Button 
+                    onClick={handleTestWesad} 
+                    disabled={isTestingWesad}
+                    className="mt-4 w-full max-w-xs"
+                    variant="outline"
+                  >
+                    {isTestingWesad ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Testing WESAD...
+                      </>
+                    ) : (
+                      <>
+                        <FlaskConical className="w-4 h-4 mr-2" />
+                        Test with Random Data
+                      </>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

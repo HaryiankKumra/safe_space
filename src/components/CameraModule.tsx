@@ -174,9 +174,15 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
       return;
     }
     setCameraStarted(!cameraStarted);
-    setCurrentEmotion(null);
-    setStressLevel(null);
-    setConfidence(0);
+    // Keep last detected emotion when stopping camera (don't clear state)
+    // Only clear when starting fresh
+    if (!cameraStarted) {
+      // Starting camera - clear previous state
+      setCurrentEmotion(null);
+      setStressLevel(null);
+      setConfidence(0);
+    }
+    // When stopping, the last emotion/stress stays visible
   };
 
   const getEmotionColor = (emotion: string | null) => {
