@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Camera, CameraOff, AlertTriangle, Play, Square, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import * as faceapi from 'face-api.js';
 
 interface CameraModuleProps {
   isActive: boolean;
@@ -21,10 +22,39 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
   const [stressLevel, setStressLevel] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<number>(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const analysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load face-api.js models
+  useEffect(() => {
+    const loadModels = async () => {
+      if (modelsLoaded || isLoadingModels) return;
+      
+      try {
+        setIsLoadingModels(true);
+        console.log('📦 Loading face-api.js models...');
+        
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+          faceapi.nets.faceExpressionNet.loadFromUri('/models'),
+        ]);
+        
+        setModelsLoaded(true);
+        console.log('✅ Face detection models loaded successfully');
+      } catch (err) {
+        console.error('❌ Error loading face models:', err);
+        setError('Failed to load emotion detection models');
+      } finally {
+        setIsLoadingModels(false);
+      }
+    };
+
+    loadModels();
+  }, []);
 
   useEffect(() => {
-    if (isActive && cameraStarted) {
+    if (isActive && cameraStarted && modelsLoaded) {
       startCamera();
     } else {
       stopCamera();
@@ -33,7 +63,7 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
     return () => {
       stopCamera();
     };
-  }, [isActive, cameraStarted]);
+  }, [isActive, cameraStarted, modelsLoaded]);
 
   const startCamera = async () => {
     try {
@@ -51,6 +81,8 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play();
           setCameraActive(true);
+          // Start continuous analysis
+          startContinuousAnalysis();
         };
       }
     } catch (err) {
@@ -61,6 +93,10 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
   };
 
   const stopCamera = () => {
+    if (analysisIntervalRef.current) {
+      clearInterval(analysisIntervalRef.current);
+      analysisIntervalRef.current = null;
+    }
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
@@ -69,62 +105,74 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
     setCameraActive(false);
   };
 
-  const captureAndAnalyzeImage = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+  const startContinuousAnalysis = () => {
+    if (analysisIntervalRef.current) return;
+    
+    // Analyze every 2 seconds
+    analysisIntervalRef.current = setInterval(async () => {
+      await analyzeFrame();
+    }, 2000);
+  };
+
+  const analyzeFrame = async () => {
+    if (!videoRef.current || !modelsLoaded || isAnalyzing) return;
 
     try {
       setIsAnalyzing(true);
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
       
-      if (!context) return;
+      const detections = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions();
 
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw current video frame to canvas
-      context.drawImage(video, 0, 0);
-
-      console.log('Starting fake facial analysis...');
-      
-      // Simulate 15 second processing time
-      await new Promise(resolve => setTimeout(resolve, 15000));
-      
-      // Generate fake results - always neutral with high confidence
-      const fakeEmotion = 'neutral';
-      const fakeConfidence = 0.9 + Math.random() * 0.1; // Random between 0.9-1.0
-      const fakeStressLevel = 'Not Stressed';
-
-      // Update state with fake results
-      setCurrentEmotion(fakeEmotion);
-      setStressLevel(fakeStressLevel);
-      setConfidence(fakeConfidence);
-
-      // Call parent callback for analytics
-      onEmotionDetected(fakeEmotion, fakeConfidence);
-
-      toast({
-        title: "Emotion Analysis Complete",
-        description: `Detected: ${fakeEmotion} (${(fakeConfidence * 100).toFixed(1)}% confidence) - ${fakeStressLevel}`,
-      });
-
-      console.log('Fake facial analysis completed:', { fakeEmotion, fakeConfidence, fakeStressLevel });
-
-    } catch (error) {
-      console.error('Analysis error:', error);
-      toast({
-        title: "Analysis Error",
-        description: "An error occurred during analysis. Please try again.",
-        variant: "destructive"
-      });
+      if (detections) {
+        const expressions = detections.expressions;
+        
+        // Find dominant emotion
+        const emotionEntries = Object.entries(expressions) as [string, number][];
+        const dominant = emotionEntries.reduce((prev, curr) => 
+          curr[1] > prev[1] ? curr : prev
+        );
+        
+        const emotion = dominant[0];
+        const conf = dominant[1];
+        
+        // Map face-api emotions to stress level
+        const stressMapping: Record<string, string> = {
+          angry: 'High Stress',
+          fearful: 'High Stress',
+          sad: 'Moderate Stress',
+          disgusted: 'Moderate Stress',
+          surprised: 'Moderate Stress',
+          neutral: 'Low Stress',
+          happy: 'No Stress'
+        };
+        
+        const stress = stressMapping[emotion] || 'Unknown';
+        
+        setCurrentEmotion(emotion);
+        setStressLevel(stress);
+        setConfidence(conf);
+        
+        // Call parent callback
+        onEmotionDetected(emotion, conf);
+        
+        console.log(`😊 Detected: ${emotion} (${(conf * 100).toFixed(1)}%) - ${stress}`);
+      }
+    } catch (err) {
+      console.error('Analysis error:', err);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleToggleCamera = () => {
+    if (!modelsLoaded) {
+      toast({
+        title: "Models Loading",
+        description: "Please wait for emotion detection models to load...",
+      });
+      return;
+    }
     setCameraStarted(!cameraStarted);
     setCurrentEmotion(null);
     setStressLevel(null);
@@ -132,143 +180,122 @@ const CameraModule: React.FC<CameraModuleProps> = ({ isActive, onEmotionDetected
   };
 
   const getEmotionColor = (emotion: string | null) => {
-    const colors = {
+    const colors: Record<string, string> = {
       happy: 'bg-green-100 text-green-800 border-green-200',
       sad: 'bg-blue-100 text-blue-800 border-blue-200',
       angry: 'bg-red-100 text-red-800 border-red-200',
       surprised: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       neutral: 'bg-gray-100 text-gray-800 border-gray-200',
-      calm: 'bg-teal-100 text-teal-800 border-teal-200'
+      fearful: 'bg-purple-100 text-purple-800 border-purple-200',
+      disgusted: 'bg-orange-100 text-orange-800 border-orange-200'
     };
-    return emotion ? (colors[emotion.toLowerCase() as keyof typeof colors] || colors.neutral) : colors.neutral;
+    return emotion ? (colors[emotion.toLowerCase()] || colors.neutral) : colors.neutral;
+  };
+
+  const getStressColor = (stress: string | null) => {
+    if (!stress) return 'bg-gray-100 text-gray-800';
+    if (stress.includes('High')) return 'bg-red-100 text-red-800';
+    if (stress.includes('Moderate')) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
   };
 
   return (
-    <Card className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-purple-100 rounded-xl">
-              {cameraActive ? (
-                <Camera className="w-5 h-5 text-purple-600" />
-              ) : (
-                <CameraOff className="w-5 h-5 text-gray-400" />
-              )}
+    <div className="space-y-4">
+      <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
+        {isLoadingModels ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 text-purple-500 mx-auto mb-2 animate-spin" />
+              <p className="text-sm text-gray-600">Loading emotion detection models...</p>
             </div>
-            <span>Facial Expression Analysis</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge className={cameraActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}>
-              {cameraActive ? 'Active' : 'Inactive'}
-            </Badge>
-            <Button
-              onClick={handleToggleCamera}
-              size="sm"
-              variant={cameraStarted ? "destructive" : "default"}
-              className="ml-2"
-            >
-              {cameraStarted ? (
-                <>
-                  <Square className="w-4 h-4 mr-1" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 mr-1" />
-                  Start
-                </>
-              )}
-            </Button>
+        ) : !cameraStarted ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="text-center">
+              <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">Click "Start" to begin camera analysis</p>
+            </div>
           </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
-          {!cameraStarted ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600">Click "Start" to begin camera analysis</p>
-              </div>
+        ) : error ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="text-center">
+              <AlertTriangle className="w-12 h-12 text-orange-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">{error}</p>
             </div>
-          ) : error ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <AlertTriangle className="w-12 h-12 text-orange-500 mx-auto mb-2" />
-                <p className="text-sm text-gray-600">{error}</p>
+          </div>
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              autoPlay
+              playsInline
+              muted
+            />
+            <canvas ref={canvasRef} className="hidden" />
+            {isAnalyzing && (
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-purple-500 text-white">
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  Analyzing
+                </Badge>
               </div>
-            </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-2">
+        <Button
+          onClick={handleToggleCamera}
+          size="sm"
+          variant={cameraStarted ? "destructive" : "default"}
+          disabled={isLoadingModels}
+        >
+          {cameraStarted ? (
+            <>
+              <Square className="w-4 h-4 mr-1" />
+              Stop
+            </>
           ) : (
             <>
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                autoPlay
-                playsInline
-                muted
-              />
-              <canvas ref={canvasRef} className="hidden" />
-              {isAnalyzing && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin" />
-                    <p className="text-lg font-medium">Analyzing Facial Expression...</p>
-                    <p className="text-sm opacity-80">Processing emotion and stress detection</p>
-                  </div>
-                </div>
-              )}
+              <Play className="w-4 h-4 mr-1" />
+              Start
             </>
           )}
-        </div>
+        </Button>
+        <Badge className={cameraActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+          {cameraActive ? 'Live' : 'Inactive'}
+        </Badge>
+      </div>
 
-        {cameraStarted && (
-          <div className="flex items-center justify-between">
-            <Button 
-              onClick={captureAndAnalyzeImage}
-              variant="outline" 
-              className="w-full"
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing... (15s)
-                </>
-              ) : (
-                'Capture & Analyze Stress'
-              )}
-            </Button>
+      {currentEmotion && (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Emotion</p>
+            <Badge className={getEmotionColor(currentEmotion)}>
+              {currentEmotion.charAt(0).toUpperCase() + currentEmotion.slice(1)}
+            </Badge>
           </div>
-        )}
-
-        {currentEmotion && (
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Detected Emotion</p>
-              <Badge className={getEmotionColor(currentEmotion)}>
-                {currentEmotion.charAt(0).toUpperCase() + currentEmotion.slice(1)}
-              </Badge>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Stress Level</p>
-              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                {stressLevel || 'Not Detected'}
-              </Badge>
-            </div>
-            <div className="col-span-2 text-center">
-              <p className="text-sm text-gray-600 mb-1">Confidence</p>
-              <Badge variant="outline">
-                {(confidence * 100).toFixed(1)}%
-              </Badge>
-            </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Stress</p>
+            <Badge className={getStressColor(stressLevel)}>
+              {stressLevel}
+            </Badge>
           </div>
-        )}
-
-        <div className="text-xs text-gray-500 text-center">
-          Powered by Mock Emotion Detection API
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Confidence</p>
+            <Badge variant="outline">
+              {(confidence * 100).toFixed(0)}%
+            </Badge>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <div className="text-xs text-gray-500 text-center">
+        Powered by face-api.js (Browser ML)
+      </div>
+    </div>
   );
 };
 

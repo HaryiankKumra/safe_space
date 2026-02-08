@@ -3,8 +3,18 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://oknvpipzzgfufvqssauz.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbnZwaXB6emdmdWZ2cXNzYXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5NDI3NTEsImV4cCI6MjA2NzUxODc1MX0.gCkp0NyoWFaRlSQi6tKmb7R5p1BN_2HroZ6IuR7w7xY";
+// Get Supabase configuration from environment variables
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ogrlozmfbkotgdcnlobo.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncmxvem1mYmtvdGdkY25sb2JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1MzkxNjIsImV4cCI6MjA4NjExNTE2Mn0.TqaLpcH-eN8ywfmJLga3RgR87L1HzQ0qK0opwAcSMSI";
+
+// Validate configuration
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error('❌ Missing Supabase configuration. Please check your .env file.');
+  throw new Error('Missing Supabase configuration');
+}
+
+console.log('✅ Supabase URL:', SUPABASE_URL);
+console.log('✅ Supabase Key configured:', SUPABASE_PUBLISHABLE_KEY ? 'Yes' : 'No');
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -19,5 +29,27 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     headers: {
       'apikey': SUPABASE_PUBLISHABLE_KEY
     }
+  },
+  db: {
+    schema: 'public'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });
+
+// Test connection on initialization
+supabase.from('user_profiles').select('count', { count: 'exact', head: true })
+  .then(({ error }) => {
+    if (error) {
+      console.error('❌ Supabase connection test failed:', error.message);
+      console.log('💡 Please ensure:');
+      console.log('   1. Database tables are created (run SUPABASE_SETUP.sql)');
+      console.log('   2. Your internet connection is working');
+      console.log('   3. Supabase project is not paused');
+    } else {
+      console.log('✅ Supabase connected successfully!');
+    }
+  });

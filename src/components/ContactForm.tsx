@@ -26,7 +26,7 @@ export default function ContactForm() {
     setStatus("");
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("contact_messages")
         .insert([
           {

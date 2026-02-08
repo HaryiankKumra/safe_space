@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useStressPrediction } from "@/hooks/useStressPrediction";
-import { useBackendPrediction } from "@/hooks/useBackendPrediction";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileNavbar } from "@/components/MobileNavbar";
 import {
@@ -16,42 +13,24 @@ import {
   Activity,
   AlertTriangle,
   Calendar,
-  Clock,
   Brain,
-  Play,
-  Pause,
   Wifi,
   WifiOff,
   CheckCircle,
-  XCircle,
-  AlertCircle,
   TrendingUp,
-  Sparkles,
-  Target,
-  Trophy,
+  Smile,
+  Frown,
+  Meh,
+  Camera,
 } from "lucide-react";
-import StressMetrics from "@/components/StressMetrics";
 import CameraModule from "@/components/CameraModule";
-import ESP32StatusCard from "@/components/ESP32StatusCard";
-import ECGChart from "@/components/ECGChart";
-import BackendPrediction from "@/components/BackendPrediction";
-import { useAIStressExplanation } from "@/hooks/useAIStressExplanation";
-import AIStressExplanation from "@/components/AIStressExplanation";
-import CombinedStressResult from "@/components/CombinedStressResult";
 
 interface BiometricData {
   id: string;
   heart_rate: number;
   temperature: number;
-  ambient_temperature: number;
   gsr_value: number;
-  gsr_baseline: number;
-  gsr_change: number;
   raw_ecg_signal: number;
-  leads_off_detected: boolean;
-  heart_rate_variability: number;
-  arrhythmia_detected: boolean;
-  device_status: any;
   stress_level: string;
   stress_score: number;
   timestamp: string;
@@ -60,41 +39,27 @@ interface BiometricData {
 
 const StressDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const isMobile = useIsMobile();
-  const { prediction, loading: predictionLoading, getPrediction } = useStressPrediction();
-  const { prediction: backendPrediction, loading: backendLoading, error: backendError, lastUpdated, sendPredictionRequest, clearError } = useBackendPrediction();
-  const { explanation, loading: aiLoading, error: aiError, lastUpdated: aiLastUpdated, generateExplanation, clearError: clearAIError } = useAIStressExplanation();
+  
   const [currentData, setCurrentData] = useState<BiometricData | null>(null);
-  const [recentDataForBackend, setRecentDataForBackend] = useState<BiometricData[]>([]);
   const [userName, setUserName] = useState<string>("");
-  const [stressLevel, setStressLevel] = useState(0.3);
-  const [stressStatus, setStressStatus] = useState<"low" | "moderate" | "high">("low");
-  const [isMonitoring, setIsMonitoring] = useState(true);
+  const [overallStress, setOverallStress] = useState<number>(0);
+  const [facialEmotion, setFacialEmotion] = useState<string>("neutral");
+  const [facialConfidence, setFacialConfidence] = useState<number>(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [dailyStats, setDailyStats] = useState({
     averageStress: 0,
-    peakStress: 0,
-    calmMinutes: 0,
-    sessionsToday: 0
+    readings: 0
   });
-  const [esp32Status, setEsp32Status] = useState({
-    connected: false,
-    deviceId: "AD8232_ECG_001",
-    lastSeen: null as Date | null,
-    sensorsActive: 0,
-    i2cEnabled: false,
-    hasRecentData: false,
-  });
-  const [facialStressLevel, setFacialStressLevel] = useState<string | null>(null);
-  const [combinedLastUpdated, setCombinedLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     if (user) {
+      const displayName = user.full_name || user.email?.split('@')[0] || 'User';
+      setUserName(displayName);
       fetchLatestData();
       fetchDailyStats();
-      const displayName = user.email?.split('@')[0] || 'User';
-      setUserName(displayName);
-      const interval = setInterval(fetchLatestData, 3000);
+      const interval = setInterval(fetchLatestData, 5000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -102,24 +67,20 @@ const StressDashboard: React.FC = () => {
   const fetchDailyStats = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
+      const { data } = await (supabase as any)
         .from("biometric_data_enhanced")
-        .select("stress_score, timestamp")
+        .select("stress_score")
         .gte("timestamp", `${today}T00:00:00`)
         .lt("timestamp", `${today}T23:59:59`);
 
       if (data && data.length > 0) {
-        const stressScores = data.map(d => d.stress_score || 0);
-        const averageStress = stressScores.reduce((a, b) => a + b, 0) / stressScores.length;
-        const peakStress = Math.max(...stressScores);
-        const calmMinutes = data.filter(d => (d.stress_score || 0) < 40).length * 3; // 3 min intervals
-        
-        setDailyStats({
-          averageStress: Math.round(averageStress),
-          peakStress: Math.round(peakStress),
-          calmMinutes,
-          sessionsToday: data.length
-        });
+        const scores = data.map((d: any) => d.stress_score || 0).filter((s: number) => s > 0);
+        if (scores.length > 0) {
+          setDailyStats({
+            averageStress: Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length),
+            readings: scores.length
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching daily stats:", error);
@@ -128,547 +89,276 @@ const StressDashboard: React.FC = () => {
 
   const fetchLatestData = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("biometric_data_enhanced")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        setIsConnected(false);
+        return;
+      }
 
       if (data) {
-        setCurrentData(data);
-        const stress = data.stress_score ? data.stress_score / 100 : 0.3;
-        setStressLevel(stress);
-
-        if (stress < 0.4) setStressStatus("low");
-        else if (stress < 0.7) setStressStatus("moderate");
-        else setStressStatus("high");
-
-        const now = new Date();
-        const dataTime = new Date(data.timestamp || data.created_at);
-        const timeDiff = now.getTime() - dataTime.getTime();
-        const hasRecentData = timeDiff < 10000;
-
-        setEsp32Status(prev => ({
-          ...prev,
-          connected: hasRecentData,
-          lastSeen: hasRecentData ? dataTime : prev.lastSeen,
-          sensorsActive: hasRecentData ? 4 : 0,
-          i2cEnabled: hasRecentData,
-          hasRecentData
-        }));
-
-        if (hasRecentData && isMonitoring) {
-          getPrediction(data);
-          
-          // Generate AI explanation when we have new data
-          generateAIExplanation(data);
-        }
+        const dataAge = Date.now() - new Date(data.created_at).getTime();
+        const isRecent = dataAge < 30000;
+        setIsConnected(isRecent);
+        setCurrentData(data as BiometricData);
+        setLastUpdate(new Date(data.created_at));
+        if (data.stress_score) setOverallStress(data.stress_score);
       } else {
-        setEsp32Status(prev => ({
-          ...prev,
-          connected: false,
-          sensorsActive: 0,
-          i2cEnabled: false,
-          hasRecentData: false
-        }));
+        setIsConnected(false);
       }
-
-      const { data: recentData, error: recentError } = await supabase
-        .from("biometric_data_enhanced")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(25);
-
-      if (recentData && recentData.length >= 20) {
-        setRecentDataForBackend(recentData);
-        
-        if (isMonitoring) {
-          console.log('Sending data to backend prediction...');
-          sendPredictionRequest(recentData);
-        }
-      } else {
-        console.log('Not enough data for backend prediction:', recentData?.length || 0);
-      }
-
     } catch (error) {
       console.error("Error fetching data:", error);
-      setEsp32Status(prev => ({
-        ...prev,
-        connected: false,
-        sensorsActive: 0,
-        i2cEnabled: false,
-        hasRecentData: false
-      }));
-    }
-  };
-
-  const generateAIExplanation = async (vitals: BiometricData) => {
-    if (!user) return;
-
-    try {
-      // Fetch patient history
-      const { data: profileData, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError) {
-        console.warn('Could not fetch user profile for AI explanation:', profileError);
-      }
-
-      // Determine stress level from current data
-      const stressLevel = vitals.stress_score 
-        ? vitals.stress_score < 40 ? 'Low' 
-          : vitals.stress_score < 70 ? 'Moderate' 
-          : 'High'
-        : 'Unknown';
-
-      // Generate explanation with patient history and current vitals
-      await generateExplanation(
-        profileData || {},
-        {
-          heart_rate: vitals.heart_rate,
-          temperature: vitals.temperature,
-          gsr_value: vitals.gsr_value,
-          stress_score: vitals.stress_score,
-        },
-        stressLevel
-      );
-    } catch (error) {
-      console.error('Error generating AI explanation:', error);
+      setIsConnected(false);
     }
   };
 
   const handleEmotionDetected = async (emotion: string, confidence: number) => {
-    console.log("Emotion detected:", emotion, confidence);
+    setFacialEmotion(emotion);
+    setFacialConfidence(confidence);
     
-    // Set facial stress level
-    const stressLevel = emotion === 'neutral' ? 'Not Stressed' : 'Stressed';
-    setFacialStressLevel(stressLevel);
-    setCombinedLastUpdated(new Date());
-    
-    // Save facial analysis data
     if (user) {
       try {
         const stressScore = getEmotionStressScore(emotion);
-        const { error } = await supabase.from('facial_analysis').insert({
+        await (supabase as any).from('facial_analysis').insert({
           user_id: user.id,
           emotion: emotion,
           confidence: confidence,
           stress_level: stressScore,
         });
-
-        if (error) {
-          console.error('Error saving facial analysis:', error);
-        } else {
-          console.log('Facial analysis saved successfully');
-        }
       } catch (error) {
-        console.error('Database error:', error);
+        console.error("Error saving facial analysis:", error);
       }
-    }
-
-    if (currentData && isMonitoring) {
-      getPrediction(currentData, { emotion, confidence });
-    }
-  };
-
-  const handleRetryAIExplanation = () => {
-    if (currentData) {
-      generateAIExplanation(currentData);
-    } else {
-      toast({
-        title: "No Current Data",
-        description: "No physiological data available for analysis.",
-        variant: "destructive",
-      });
     }
   };
 
   const getEmotionStressScore = (emotion: string): number => {
-    const emotionStressMap: { [key: string]: number } = {
-      happy: 10,
-      calm: 5,
-      neutral: 20,
-      surprised: 40,
-      sad: 70,
-      angry: 90,
-      anxious: 85,
-      focused: 25
+    const map: { [key: string]: number } = {
+      happy: 10, calm: 5, neutral: 25, surprised: 45, sad: 70, angry: 90, anxious: 85, focused: 20
     };
-    return emotionStressMap[emotion] || 30;
+    return map[emotion] || 30;
   };
 
-  const handleRetryBackendPrediction = () => {
-    if (recentDataForBackend.length >= 20) {
-      sendPredictionRequest(recentDataForBackend);
-    } else {
-      toast({
-        title: "Insufficient Data",
-        description: "Need at least 20 sensor readings for prediction.",
-        variant: "destructive",
-      });
+  const getStressColor = (score: number) => {
+    if (score < 30) return "text-green-500";
+    if (score < 60) return "text-yellow-500";
+    return "text-red-500";
+  };
+
+  const getStressLabel = (score: number) => {
+    if (score < 30) return "Low";
+    if (score < 60) return "Moderate";
+    return "High";
+  };
+
+  const getEmotionIcon = (emotion: string) => {
+    switch (emotion.toLowerCase()) {
+      case 'happy':
+      case 'calm':
+        return <Smile className="w-8 h-8 text-green-500" />;
+      case 'sad':
+      case 'angry':
+      case 'anxious':
+        return <Frown className="w-8 h-8 text-red-500" />;
+      default:
+        return <Meh className="w-8 h-8 text-yellow-500" />;
     }
   };
 
   return (
     <>
       {isMobile && <MobileNavbar />}
-      <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 p-4 lg:p-6 ${isMobile ? 'pt-20' : ''}`}>
-        <div className="max-w-7xl mx-auto space-y-4 lg:space-y-6">
+      <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 ${isMobile ? 'pt-16' : ''}`}>
+        <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6">
+          
           {/* Header */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-4 lg:p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  {!isMobile && (
-                    <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500">
-                      <Brain className="w-6 h-6 text-white" />
-                    </div>
-                  )}
-                  <h1 className="text-xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                    Welcome back, {userName}! 👋
-                  </h1>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-300">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{new Date().toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}</span>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+                Welcome, {userName}
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
+                <Calendar className="w-4 h-4" />
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant={isConnected ? "default" : "secondary"} className={`${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}>
+                {isConnected ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
+                {isConnected ? 'Live' : 'Offline'}
+              </Badge>
+              {lastUpdate && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Updated {lastUpdate.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Main Stress Score Card */}
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur border-0 shadow-xl">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row items-center gap-6">
+                <div className="relative w-40 h-40 flex-shrink-0">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="none" className="text-gray-200 dark:text-gray-700" />
+                    <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="none" strokeDasharray={`${overallStress * 2.51} 251`} strokeLinecap="round" className={getStressColor(overallStress)} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className={`text-4xl font-bold ${getStressColor(overallStress)}`}>{overallStress}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Stress</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>Last update: {currentData ? new Date(currentData.timestamp || currentData.created_at).toLocaleTimeString() : "Never"}</span>
+                </div>
+                <div className="flex-1 text-center lg:text-left">
+                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    {getStressLabel(overallStress)} Stress
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    {overallStress < 30 && "You're doing great! Keep up the good work."}
+                    {overallStress >= 30 && overallStress < 60 && "Some stress detected. Consider a short break."}
+                    {overallStress >= 60 && "High stress. Try some relaxation techniques."}
+                  </p>
+                  <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+                    <Badge variant="outline"><TrendingUp className="w-3 h-3 mr-1" />Avg: {dailyStats.averageStress}%</Badge>
+                    <Badge variant="outline"><Activity className="w-3 h-3 mr-1" />{dailyStats.readings} readings</Badge>
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                <div className="flex items-center gap-2">
-                  {esp32Status.connected ? (
-                    <Wifi className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <WifiOff className="w-4 h-4 text-red-500" />
-                  )}
-                  <Badge variant={esp32Status.connected ? "default" : "destructive"} className="px-3 py-1 text-xs">
-                    {esp32Status.connected ? "Connected" : "Disconnected"}
-                  </Badge>
-                </div>
-                <Button
-                  onClick={() => setIsMonitoring(!isMonitoring)}
-                  variant={isMonitoring ? "destructive" : "default"}
-                  className="px-4 py-2 w-full sm:w-auto"
-                  size={isMobile ? "sm" : "default"}
-                >
-                  {isMonitoring ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                  {isMonitoring ? "Pause" : "Start"}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Stress Explanation Display */}
-          <AIStressExplanation
-            explanation={explanation}
-            loading={aiLoading}
-            error={aiError}
-            lastUpdated={aiLastUpdated}
-            onRetry={handleRetryAIExplanation}
-            onClearError={clearAIError}
-          />
-
-          {/* Combined Stress Result Display */}
-          <CombinedStressResult
-            physiologicalStress={backendPrediction}
-            facialStress={facialStressLevel}
-            lastUpdated={combinedLastUpdated}
-          />
-
-          {/* Backend AI Prediction Display */}
-          <BackendPrediction
-            prediction={backendPrediction}
-            loading={backendLoading}
-            error={backendError}
-            lastUpdated={lastUpdated}
-            onRetry={handleRetryBackendPrediction}
-            onClearError={clearError}
-          />
-
-          {/* AI Prediction Display */}
-          {prediction && (
-            <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-700">
-              <CardHeader className="p-4 lg:p-6">
-                <CardTitle className="flex items-center gap-2 text-purple-800 dark:text-purple-200 text-lg">
-                  <Sparkles className="w-5 h-5" />
-                  AI Stress Analysis
-                  {predictionLoading && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 p-4 lg:p-6 pt-0">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <Badge className={`${
-                    prediction.stressLevel === 'low' ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/20 dark:text-green-400' :
-                    prediction.stressLevel === 'moderate' ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                    'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/20 dark:text-red-400'
-                  }`}>
-                    {prediction.stressLevel.charAt(0).toUpperCase() + prediction.stressLevel.slice(1)} Stress
-                  </Badge>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
-                    Confidence: {(prediction.confidence * 100).toFixed(1)}%
-                  </span>
-                </div>
-                {prediction.recommendations.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recommendations:</p>
-                    <ul className="list-disc list-inside space-y-1">
-                      {prediction.recommendations.map((rec, index) => (
-                        <li key={index} className="text-sm text-gray-600 dark:text-gray-400">{rec}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Daily Insights Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Target className="w-3 lg:w-4 h-3 lg:h-4 text-blue-500" />
-                  <span className="hidden sm:inline">Today's Average</span>
-                  <span className="sm:hidden">Average</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {dailyStats.averageStress}%
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">Stress</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Daily average stress level</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-orange-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <TrendingUp className="w-3 lg:w-4 h-3 lg:h-4 text-orange-500" />
-                  <span className="hidden sm:inline">Peak Stress</span>
-                  <span className="sm:hidden">Peak</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {dailyStats.peakStress}%
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">Max</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Highest stress today</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-green-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Heart className="w-3 lg:w-4 h-3 lg:h-4 text-green-500" />
-                  <span className="hidden sm:inline">Calm Time</span>
-                  <span className="sm:hidden">Calm</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {dailyStats.calmMinutes}
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">min</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Low stress periods</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-purple-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Trophy className="w-3 lg:w-4 h-3 lg:h-4 text-purple-500" />
-                  Sessions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {dailyStats.sessionsToday}
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">today</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Monitoring sessions</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Essential Sensor Data */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Heart className="w-3 lg:w-4 h-3 lg:h-4 text-red-500" />
-                  <span className="hidden sm:inline">Heart Rate</span>
-                  <span className="sm:hidden">HR</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {currentData?.heart_rate || 0}
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">BPM</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {currentData?.leads_off_detected ? (
-                      <XCircle className="w-3 h-3 text-red-500" />
-                    ) : (
-                      <CheckCircle className="w-3 h-3 text-green-500" />
-                    )}
-                    <span className="text-xs text-gray-600 dark:text-gray-300">
-                      {currentData?.leads_off_detected ? "Disconnected" : "Connected"}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-red-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Thermometer className="w-3 lg:w-4 h-3 lg:h-4 text-red-500" />
-                  <span className="hidden sm:inline">Temperature</span>
-                  <span className="sm:hidden">Temp</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {currentData?.temperature?.toFixed(1) || "0.0"}
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">°C</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">MLX90614</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-purple-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Zap className="w-3 lg:w-4 h-3 lg:h-4 text-purple-500" />
-                  <span className="hidden sm:inline">EDA Level</span>
-                  <span className="sm:hidden">EDA</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {currentData?.gsr_value?.toFixed(0) || 0}
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">Ω</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Skin conductance</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-300">
-              <CardHeader className="pb-2 p-3 lg:p-4">
-                <CardTitle className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
-                  <Activity className="w-3 lg:w-4 h-3 lg:h-4 text-blue-500" />
-                  <span className="hidden sm:inline">ECG Signal</span>
-                  <span className="sm:hidden">ECG</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 lg:p-4 pt-0">
-                <div className="space-y-1">
-                  <div className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-white">
-                    {currentData?.raw_ecg_signal || 0}
-                    <span className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 ml-1">mV</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {currentData?.arrhythmia_detected ? (
-                      <AlertCircle className="w-3 h-3 text-yellow-500" />
-                    ) : (
-                      <CheckCircle className="w-3 h-3 text-green-500" />
-                    )}
-                    <span className="text-xs text-gray-600 dark:text-gray-300">
-                      {currentData?.arrhythmia_detected ? "Irregular" : "Normal"}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* ECG Real-time Chart */}
-          {esp32Status.hasRecentData && (
-            <ECGChart
-              isActive={isMonitoring}
-              rawEcgSignal={currentData?.raw_ecg_signal}
-              heartRate={currentData?.heart_rate}
-              leadsOffDetected={currentData?.leads_off_detected}
-              arrhythmiaDetected={currentData?.arrhythmia_detected}
-            />
-          )}
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
-            <div className="space-y-4 lg:space-y-6">
-              <StressMetrics
-                stressLevel={stressLevel}
-                stressStatus={stressStatus}
-                signalQuality={{
-                  bvp: 92,
-                  eda: 88,
-                  temp: 95,
-                  hr: 91,
-                }}
-                isMonitoring={isMonitoring}
-              />
-              <ESP32StatusCard status={esp32Status} />
-            </div>
-
-            <div className="space-y-4 lg:space-y-6">
-              <CameraModule
-                isActive={isMonitoring}
-                onEmotionDetected={handleEmotionDetected}
-              />
-            </div>
-          </div>
-
-          {/* High Stress Alert */}
-          {stressStatus === "high" && (
-            <Card className="bg-red-50/90 dark:bg-red-950/30 backdrop-blur-sm border-l-4 border-l-red-500">
+          {/* Vital Signs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-0 shadow-lg">
               <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 dark:bg-red-900/50 rounded-full">
-                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                    <Heart className="w-5 h-5 text-red-500" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-red-800 dark:text-red-200">
-                      High Stress Level Detected
-                    </h3>
-                    <p className="text-sm text-red-700 dark:text-red-300">
-                      Consider taking a break and trying some relaxation techniques.
-                    </p>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Heart Rate</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.heart_rate || '--'}<span className="text-sm font-normal text-gray-500 ml-1">BPM</span>
+                </div>
+                <Progress value={currentData?.heart_rate ? Math.min((currentData.heart_rate / 200) * 100, 100) : 0} className="h-1 mt-2" />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                    <Thermometer className="w-5 h-5 text-orange-500" />
                   </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Temp</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.temperature?.toFixed(1) || '--'}<span className="text-sm font-normal text-gray-500 ml-1">°C</span>
+                </div>
+                <Progress value={currentData?.temperature ? ((currentData.temperature - 35) / 5) * 100 : 0} className="h-1 mt-2" />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <Zap className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">EDA</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.gsr_value?.toFixed(0) || '--'}<span className="text-sm font-normal text-gray-500 ml-1">Ω</span>
+                </div>
+                <Progress value={currentData?.gsr_value ? Math.min((currentData.gsr_value / 1000) * 100, 100) : 0} className="h-1 mt-2" />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <Activity className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">ECG</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentData?.raw_ecg_signal?.toFixed(2) || '--'}<span className="text-sm font-normal text-gray-500 ml-1">mV</span>
+                </div>
+                <div className="flex items-center gap-1 mt-2">
+                  <CheckCircle className="w-3 h-3 text-green-500" />
+                  <span className="text-xs text-gray-500">Normal</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Camera & Emotion */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-0 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Camera className="w-5 h-5 text-blue-500" />
+                  Facial Analysis
+                </CardTitle>
+                <CardDescription>Real-time emotion detection</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CameraModule isActive={true} onEmotionDetected={handleEmotionDetected} />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-0 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Brain className="w-5 h-5 text-purple-500" />
+                  Current Emotion
+                </CardTitle>
+                <CardDescription>AI-detected expression</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
+                    {getEmotionIcon(facialEmotion)}
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white capitalize mb-2">{facialEmotion}</h3>
+                  <Badge variant="outline" className="mb-4">{(facialConfidence * 100).toFixed(0)}% confidence</Badge>
+                  <div className="w-full max-w-xs">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Relaxed</span>
+                      <span>Stressed</span>
+                    </div>
+                    <Progress value={getEmotionStressScore(facialEmotion)} className="h-2" />
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
+                    Facial stress: {getEmotionStressScore(facialEmotion)}%
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Alert */}
+          {overallStress >= 70 && (
+            <Card className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/50">
+                  <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-red-800 dark:text-red-200">High Stress Detected</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Consider taking a break. Try deep breathing or use the AI chat for advice.
+                  </p>
                 </div>
               </CardContent>
             </Card>
           )}
+
         </div>
       </div>
     </>

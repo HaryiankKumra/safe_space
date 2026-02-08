@@ -1,6 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { getErrorMessage, logError } from '@/utils/errorHandling';
+import { analyzeWearableStress } from '@/services/huggingface';
 
 interface PredictionData {
   data: number[][][];
@@ -40,18 +41,15 @@ export const useBackendPrediction = () => {
     setResult(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      console.log('Starting fake prediction for backend...');
+      console.log('Starting wearable stress prediction with Hugging Face...');
       
-      // Simulate 10 second delay
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // Call real Hugging Face WESAD model
+      const predictionResult = await analyzeWearableStress(sensorData);
       
-      // Always return "not stressed" (prediction value 0 means not stressed)
-      const fakePrediction = 0;
-      
-      console.log('Fake backend prediction completed:', fakePrediction);
+      console.log('Wearable stress prediction completed:', predictionResult);
 
       setResult({
-        prediction: fakePrediction,
+        prediction: predictionResult.prediction,
         loading: false,
         error: null,
         lastUpdated: new Date()

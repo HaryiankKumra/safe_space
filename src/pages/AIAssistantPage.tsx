@@ -69,11 +69,18 @@ const AIAssistantPage: React.FC = () => {
       }
 
       // Call AI chatbot function
+      console.log('🤖 Calling stress-chatbot Edge Function with message:', inputValue);
+      
       const { data, error } = await supabase.functions.invoke('stress-chatbot', {
         body: { message: inputValue }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Edge Function error:', error);
+        throw error;
+      }
+
+      console.log('✅ Chatbot response received:', data);
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -134,7 +141,7 @@ const AIAssistantPage: React.FC = () => {
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (biometricError || profileError) {
         throw new Error('Failed to fetch health data');

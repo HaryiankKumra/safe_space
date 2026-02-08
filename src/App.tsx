@@ -14,9 +14,9 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import HealthRecordsPage from "./pages/HealthRecordsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
-import CameraAnalysisPage from "./pages/CameraAnalysisPage";
 import StressAlertsPage from "./pages/StressAlertsPage";
 import NotFound from "./pages/NotFound";
+import OAuthCallback from "./pages/auth/OAuthCallback";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { DashboardSidebar } from "./components/DashboardSidebar";
@@ -73,15 +73,11 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 
+                {/* OAuth callback route */}
+                <Route path="/auth/callback" element={<OAuthCallback />} />
+                
                 {/* Protected dashboard routes */}
                 <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <DashboardLayout>
-                      <StressDashboard />
-                    </DashboardLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/dashboard/monitoring" element={
                   <ProtectedRoute>
                     <DashboardLayout>
                       <StressDashboard />
@@ -113,13 +109,6 @@ function App() {
                   <ProtectedRoute>
                     <DashboardLayout>
                       <AIAssistantPage />
-                    </DashboardLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/dashboard/camera" element={
-                  <ProtectedRoute>
-                    <DashboardLayout>
-                      <CameraAnalysisPage />
                     </DashboardLayout>
                   </ProtectedRoute>
                 } />

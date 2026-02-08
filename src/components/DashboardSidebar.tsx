@@ -19,17 +19,9 @@ import {
   MessageCircle, 
   FileText, 
   Settings, 
-  Activity,
-  Camera,
   BarChart3,
-  Brain,
-  User,
   Bell,
-  Shield,
-  Database,
-  Zap,
-  Heart,
-  TrendingUp
+  Brain
 } from "lucide-react";
 
 const navigationItems = [
@@ -38,12 +30,6 @@ const navigationItems = [
     url: "/dashboard",
     icon: LayoutDashboard,
     badge: null,
-  },
-  {
-    title: "Live Monitoring",
-    url: "/dashboard/monitoring",
-    icon: Activity,
-    badge: "Live",
   },
   {
     title: "Analytics",
@@ -70,12 +56,6 @@ const quickActions = [
     title: "AI Assistant",
     url: "/dashboard/chat",
     icon: MessageCircle,
-    badge: null,
-  },
-  {
-    title: "Camera Analysis",
-    url: "/dashboard/camera",
-    icon: Camera,
     badge: null,
   },
   {

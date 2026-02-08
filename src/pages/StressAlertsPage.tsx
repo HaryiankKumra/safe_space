@@ -81,7 +81,7 @@ const StressAlertsPage: React.FC = () => {
         .from("user_profiles")
         .select("stress_threshold_high, preferred_notification_time")
         .eq("user_id", user?.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -106,9 +106,9 @@ const StressAlertsPage: React.FC = () => {
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
       setCurrentStressData(data);
     } catch (error) {
       console.error("Error fetching current stress data:", error);
@@ -125,7 +125,7 @@ const StressAlertsPage: React.FC = () => {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error || !data) return;
 
